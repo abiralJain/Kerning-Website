@@ -1,0 +1,4170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>kern.me</title>
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    display: flex;
+    flex-direction: row;
+    background: #3e1824;
+    color: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+  }
+
+  /* ── stage ── */
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .stage-wrap {
+    position: relative;
+    width: 100%;
+    z-index: 1;
+  }
+  #stage {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  #particles {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  #annotCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* ── canvas cursor ── */
+  .canvas-wrap { cursor: text; }
+
+  /* ── panel ── */
+  .panel {
+    display: none !important;
+    width: 230px;
+    flex-shrink: 0;
+    background: #18191a;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    padding: 18px 14px 16px;
+    gap: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    color-scheme: dark;
+    transition: width 0.22s ease, padding 0.22s ease;
+  }
+  .panel.collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    overflow: hidden;
+  }
+  .panel-toggle {
+    display: none !important;
+    flex-shrink: 0;
+    align-self: center;
+    width: 20px;
+    height: 48px;
+    background: #18191a;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+    color: rgba(255,255,255,0.4);
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+  }
+  .panel-toggle:hover { color: rgba(255,255,255,0.8); }
+  .canvas-wrap { position: relative; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .panel-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.28);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .section-header .panel-label { margin-bottom: 0; }
+  .copy-btn {
+    font-size: 8px;
+    padding: 2px 7px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .copy-btn:hover { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.1); }
+  .copy-btn.copied { color: rgba(180,255,180,0.8); }
+  input[type="text"], select {
+    background: #242526;
+    color: #e0e0e0;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+    transition: border-color 0.15s;
+    color-scheme: dark;
+  }
+  input[type="text"]:focus, select:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+  #word {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    border-radius: 0;
+    padding: 2px 0 8px;
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.88);
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #word:focus { outline: none; border-bottom-color: rgba(255,255,255,0.35); }
+  select { cursor: pointer; }
+
+  .algo-tab {
+    position: absolute;
+    top: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    background: rgba(0,0,0,0.25);
+    border-radius: 100px;
+    padding: 4px;
+    z-index: 2;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .algo-tab-indicator {
+    position: absolute;
+    top: 4px; bottom: 4px; left: 4px;
+    width: 80px;
+    background: rgba(255,255,255,0.92);
+    border-radius: 100px;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .algo-btn {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    color: rgba(255,255,255,0.55);
+    border: none;
+    border-radius: 100px;
+    padding: 8px 24px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: color 0.22s;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .algo-btn:hover { color: rgba(255,255,255,0.85); }
+  .algo-btn.on { color: #1a1a1a; }
+
+  input[type="range"] {
+    flex: 1;
+    accent-color: rgba(194,251,255,0.7);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    height: 16px;
+  }
+
+  .action-row { display: flex; gap: 5px; }
+  .btn {
+    flex: 1;
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 8px 6px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+  .btn.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.22); color: #fff; }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.06); }
+
+  .status {
+    margin-top: auto;
+    font-size: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: rgba(255,255,255,0.2);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .error { color: #e06060; }
+
+  .param-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .param-name {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    width: 84px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .param-row input[type="range"] { flex: 1; min-width: 0; width: 0; }
+  .param-val {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .bg-image-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .bg-image-btn {
+    flex: 1;
+    background: #242526;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bg-image-btn:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.75); }
+  .bg-clear-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    padding: 5px 7px;
+    font-size: 11px;
+    font-family: inherit;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .bg-clear-btn:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.7); }
+  #bgImageInput { display: none; }
+  #credit {
+    position: fixed;
+    bottom: 18px;
+    right: 24px;
+    font-size: 12px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: rgba(255,255,255,0.22);
+    pointer-events: auto;
+    letter-spacing: 0;
+  }
+  #credit a {
+    color: rgba(255,255,255,0.38);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  #credit a:hover { color: rgba(255,255,255,0.7); }
+  input[type="color"] {
+    -webkit-appearance: none;
+    width: 36px;
+    height: 22px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 1px 2px;
+    background: none;
+    flex-shrink: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+
+  .canvas-wrap:focus { outline: none; }
+  @keyframes cursorBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes annotDotPop {
+    0%   { opacity:0; transform:scale(0); }
+    100% { opacity:1; transform:scale(1); }
+  }
+  /* annotCardIn replaced by Web Animations API (directional slide per card) */
+  #svgSelection { fill-opacity: 0.05; }
+  #svgCursor { fill: var(--cursor-color, rgba(255,255,255,0.75)); animation: cursorBlink 1.1s ease-in-out infinite; }
+
+  /* ── customization panel (FONT / SIZE / WEIGHT / IMAGE) ── */
+  #customToggle {
+    position: fixed;
+    top: 22px;
+    left: 24px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(33,13,19,0.72);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: rgba(255,255,255,0.7);
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 15px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  #customToggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(33,13,19,0.9); }
+
+  #customPanel {
+    position: fixed;
+    top: 70px;
+    left: 24px;
+    z-index: 20;
+    width: 290px;
+    padding: 18px 18px 16px;
+    border-radius: 14px;
+    background: rgba(33,13,19,0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    color-scheme: dark;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transform-origin: top left;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #customPanel.hidden {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+    pointer-events: none;
+  }
+  .cust-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cust-label {
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    width: 62px;
+    flex-shrink: 0;
+  }
+  .cust-row select,
+  .cust-row input[type="range"] { flex: 1; min-width: 0; }
+  #custFont, #custWeight {
+    background: rgba(255,255,255,0.04);
+    color: #ececec;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    cursor: pointer;
+    color-scheme: dark;
+  }
+  #custFont:focus, #custWeight:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  #custWeight:disabled { opacity: 0.4; cursor: not-allowed; }
+  #custSize {
+    accent-color: #c2fbff;
+    cursor: pointer;
+    height: 16px;
+    background: transparent;
+  }
+  .cust-val {
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  #custImageBtn {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color: rgba(255,255,255,0.6);
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #custImageBtn:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+  #custImageClear {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-size: 12px;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  #custImageClear:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+  #custImageInput { display: none; }
+</style>
+</head>
+<body>
+<div class="canvas-wrap" tabindex="0">
+  <canvas id="particles"></canvas>
+  <div class="stage-wrap">
+    <svg id="stage" viewBox="0 0 1400 420" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <filter id="annotShadowF" x="-60%" y="-60%" width="220%" height="220%">
+          <feDropShadow dx="0" dy="3" stdDeviation="0" flood-color="#000" flood-opacity="0.55"/>
+        </filter>
+      </defs>
+      <rect id="svgCursor" display="none" width="1.5" height="10" rx="0" />
+      <rect id="svgSelection" display="none" rx="4" />
+      <g id="lettersLayer"></g>
+      <g id="annotLayer" pointer-events="none"></g>
+    </svg>
+  </div>
+  <canvas id="annotCanvas"></canvas>
+  <div id="credit">Made by <a href="https://abiraljain.com/" target="_blank" rel="noopener">Abiral Jain</a></div>
+  <div class="algo-tab">
+    <div class="algo-tab-indicator shifted"></div>
+    <button class="algo-btn" data-algo="default">Off</button>
+    <button class="algo-btn on" data-algo="optical">Optical Kerning</button>
+  </div>
+</div>
+
+<button id="customToggle" title="Customize">Aa</button>
+<div id="customPanel" class="hidden">
+  <div class="cust-row">
+    <span class="cust-label">Font</span>
+    <select id="custFont">
+      <optgroup label="Sans-Serif">
+        <option value="inter">Inter</option>
+        <option value="roboto">Roboto</option>
+        <option value="opensans">Open Sans</option>
+        <option value="lato">Lato</option>
+        <option value="montserrat">Montserrat</option>
+        <option value="raleway">Raleway</option>
+        <option value="nunito">Nunito</option>
+        <option value="dmsans">DM Sans</option>
+        <option value="spacegrotesk">Space Grotesk</option>
+        <option value="oswald">Oswald</option>
+      </optgroup>
+      <optgroup label="Serif">
+        <option value="instrumentserif">Instrument Serif</option>
+        <option value="playfairdisplay">Playfair Display</option>
+        <option value="merriweather">Merriweather</option>
+        <option value="lora">Lora</option>
+        <option value="cormorantgaramond">Cormorant Garamond</option>
+        <option value="dmserifdisplay">DM Serif Display</option>
+        <option value="librebaskerville">Libre Baskerville</option>
+        <option value="ebgaramond">EB Garamond</option>
+      </optgroup>
+      <optgroup label="Display">
+        <option value="anton">Anton</option>
+        <option value="abrilfatface">Abril Fatface</option>
+        <option value="righteous">Righteous</option>
+        <option value="pacifico">Pacifico</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="cust-row">
+    <span class="cust-label">Size</span>
+    <input id="custSize" type="range" min="60" max="500" step="1" value="200" />
+    <span class="cust-val" id="custSizeVal">Auto</span>
+  </div>
+  <div class="cust-row">
+    <span class="cust-label">Weight</span>
+    <select id="custWeight">
+      <option value="300">300</option>
+      <option value="400" selected>400</option>
+      <option value="500">500</option>
+      <option value="600">600</option>
+      <option value="700">700</option>
+      <option value="800">800</option>
+      <option value="900">900</option>
+    </select>
+  </div>
+  <div class="cust-row">
+    <span class="cust-label">Image</span>
+    <button id="custImageBtn">Choose file…</button>
+    <button id="custImageClear" title="Reset background">✕</button>
+    <input type="file" id="custImageInput" accept="image/*" />
+  </div>
+</div>
+
+<button id="panelToggle" class="panel-toggle" title="Toggle panel">‹</button>
+<aside class="panel">
+  <div>
+    <div class="section-header">
+      <div class="panel-label">Global Colors</div>
+      <button class="copy-btn" id="copyGlobalColors">Copy</button>
+    </div>
+    <div class="color-row">
+      <span class="param-name">Shrinks</span>
+      <input id="cAnnotNeg" type="color" value="#ff70fa" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Inflates</span>
+      <input id="cAnnotPos" type="color" value="#8aff99" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Risk</span>
+      <input id="cAnnotRisk" type="color" value="#ff884d" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Card dots</span>
+      <input id="cAnnotDot" type="color" value="#9a6071" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Cursor</span>
+      <input id="cCursor" type="color" value="#c2fbff" />
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="panel-label">Word</div>
+    <input id="word" type="text" value="Kerning" maxlength="22" spellcheck="false" autocomplete="off" />
+  </div>
+
+  <div>
+    <div class="panel-label">Font</div>
+    <select id="font">
+      <optgroup label="Sans-Serif">
+        <option value="inter">Inter</option>
+        <option value="roboto">Roboto</option>
+        <option value="opensans">Open Sans</option>
+        <option value="lato">Lato</option>
+        <option value="montserrat">Montserrat</option>
+        <option value="raleway">Raleway</option>
+        <option value="nunito">Nunito</option>
+        <option value="dmsans">DM Sans</option>
+        <option value="spacegrotesk">Space Grotesk</option>
+        <option value="oswald">Oswald</option>
+      </optgroup>
+      <optgroup label="Serif">
+        <option value="instrumentserif">Instrument Serif</option>
+        <option value="playfairdisplay">Playfair Display</option>
+        <option value="merriweather">Merriweather</option>
+        <option value="lora">Lora</option>
+        <option value="cormorantgaramond">Cormorant Garamond</option>
+        <option value="dmserifdisplay">DM Serif Display</option>
+        <option value="librebaskerville">Libre Baskerville</option>
+        <option value="ebgaramond">EB Garamond</option>
+      </optgroup>
+      <optgroup label="Display">
+        <option value="anton">Anton</option>
+        <option value="abrilfatface">Abril Fatface</option>
+        <option value="righteous">Righteous</option>
+        <option value="pacifico">Pacifico</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div>
+    <div class="panel-label">Tracking</div>
+    <div class="slider-wrap">
+      <input id="tracking" type="range" min="-8" max="60" step="1" value="0" />
+      <span class="slider-val" id="trackingVal">+0</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="section-header">
+      <div class="panel-label">Colors</div>
+      <button class="copy-btn" id="copyColors">Copy</button>
+    </div>
+    <div class="color-row">
+      <span class="param-name">BG</span>
+      <input id="cBg" type="color" value="#3e1824" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Type</span>
+      <input id="cType" type="color" value="#c2fbff" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Dots</span>
+      <input id="cDots" type="color" value="#8d7c81" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Labels</span>
+      <input id="cLabels" type="color" value="#c2fbff" />
+    </div>
+    <div class="color-row">
+      <span class="param-name">Lines</span>
+      <input id="cConnector" type="color" value="#c2fbff" />
+    </div>
+    <div class="param-row">
+      <span class="param-name">Line wt.</span>
+      <input id="pConnectorW" type="range" min="0" max="4" step="0.1" value="1.5" />
+      <span class="param-val" id="pConnectorWVal">1.5</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Line opacity</span>
+      <input id="pConnectorOp" type="range" min="0" max="1" step="0.01" value="0.22" />
+      <span class="param-val" id="pConnectorOpVal">0.22</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Cluster spread</span>
+      <input id="pFloorSpread" type="range" min="0.005" max="4" step="0.005" value="0.045" />
+      <span class="param-val" id="pFloorSpreadVal">0.045</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Cluster scatter</span>
+      <input id="pFloorScatter" type="range" min="1" max="120" step="1" value="80" />
+      <span class="param-val" id="pFloorScatterVal">80</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Match density</span>
+      <button id="btnMatchDensity" class="btn on" style="flex:0;padding:4px 10px;font-size:10px">On</button>
+    </div>
+    <div class="bg-image-row">
+      <span class="param-name">Image</span>
+      <button class="bg-image-btn" id="bgImageBtn">Choose file…</button>
+      <button class="bg-clear-btn" id="bgClearBtn" title="Remove image">✕</button>
+      <input type="file" id="bgImageInput" accept="image/*" />
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="section-header">
+      <div class="panel-label">Dots</div>
+      <button class="copy-btn" id="copyDots">Copy</button>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Size</span>
+      <input id="pSize" type="range" min="0.2" max="8.0" step="0.05" value="0.8" />
+      <span class="param-val" id="pSizeVal">0.8</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Count</span>
+      <input id="pCount" type="range" min="50" max="10000" step="50" value="4100" />
+      <span class="param-val" id="pCountVal">4100</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Speed</span>
+      <input id="pSpeed" type="range" min="0.1" max="10" step="0.1" value="4.5" />
+      <span class="param-val" id="pSpeedVal">4.5</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Amp</span>
+      <input id="pAmp" type="range" min="0.1" max="10" step="0.1" value="3.5" />
+      <span class="param-val" id="pAmpVal">3.5</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Opacity</span>
+      <input id="pOpacity" type="range" min="0.05" max="1" step="0.05" value="1.0" />
+      <span class="param-val" id="pOpacityVal">1.0</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="section-header">
+      <div class="panel-label">Motion</div>
+      <button class="copy-btn" id="copyMotion">Copy</button>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Speed</span>
+      <input id="mSpeed" type="range" min="0.2" max="4" step="0.1" value="1.0" />
+      <span class="param-val" id="mSpeedVal">1.0</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Gravity</span>
+      <input id="mGravity" type="range" min="0.1" max="4" step="0.1" value="0.7" />
+      <span class="param-val" id="mGravityVal">0.7</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Drift</span>
+      <input id="mDrift" type="range" min="0" max="200" step="5" value="90" />
+      <span class="param-val" id="mDriftVal">90</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Wobble</span>
+      <input id="mWobble" type="range" min="0" max="60" step="1" value="22" />
+      <span class="param-val" id="mWobbleVal">22</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Magnet</span>
+      <input id="mMagnet" type="range" min="0.1" max="0.95" step="0.05" value="0.7" />
+      <span class="param-val" id="mMagnetVal">0.7</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="section-header">
+      <div class="panel-label">Annotation Cards</div>
+      <button class="copy-btn" id="copyAnnotCards">Copy</button>
+    </div>
+    <div class="color-row">
+      <span class="param-name">Card BG</span>
+      <input id="cAnnotBg" type="color" value="#210d13" />
+    </div>
+    <div class="param-row">
+      <span class="param-name">BG opacity</span>
+      <input id="pAnnotBgOp" type="range" min="0" max="1" step="0.01" value="0.95" />
+      <span class="param-val" id="pAnnotBgOpVal">0.95</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Padding</span>
+      <input id="pAnnotPad" type="range" min="4" max="24" step="1" value="16" />
+      <span class="param-val" id="pAnnotPadVal">16</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Margin</span>
+      <input id="pAnnotMargin" type="range" min="2" max="80" step="1" value="14" />
+      <span class="param-val" id="pAnnotMarginVal">14</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Shadow</span>
+      <input id="pAnnotShadow" type="range" min="0" max="20" step="0.5" value="15" />
+      <span class="param-val" id="pAnnotShadowVal">15</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Font</span>
+      <select id="sAnnotFont" style="flex:1;font-size:11px;background:#242526;color:#e0e0e0;border:1px solid rgba(255,255,255,0.1);border-radius:5px;padding:3px 6px">
+        <optgroup label="System">
+          <option value="system">System Sans</option>
+          <option value="mono">System Mono</option>
+          <option value="serif">System Serif</option>
+        </optgroup>
+        <optgroup label="Sans-Serif">
+          <option value="af-inter" selected>Inter</option>
+          <option value="af-roboto">Roboto</option>
+          <option value="af-opensans">Open Sans</option>
+          <option value="af-lato">Lato</option>
+          <option value="af-montserrat">Montserrat</option>
+          <option value="af-raleway">Raleway</option>
+          <option value="af-nunito">Nunito</option>
+          <option value="af-dmsans">DM Sans</option>
+          <option value="af-spacegrotesk">Space Grotesk</option>
+          <option value="af-oswald">Oswald</option>
+        </optgroup>
+        <optgroup label="Serif">
+          <option value="af-instrumentserif">Instrument Serif</option>
+          <option value="af-playfairdisplay">Playfair Display</option>
+          <option value="af-merriweather">Merriweather</option>
+          <option value="af-lora">Lora</option>
+          <option value="af-cormorantgaramond">Cormorant Garamond</option>
+          <option value="af-dmserifdisplay">DM Serif Display</option>
+          <option value="af-librebaskerville">Libre Baskerville</option>
+          <option value="af-ebgaramond">EB Garamond</option>
+        </optgroup>
+        <optgroup label="Display">
+          <option value="af-anton">Anton</option>
+          <option value="af-abrilfatface">Abril Fatface</option>
+          <option value="af-righteous">Righteous</option>
+          <option value="af-pacifico">Pacifico</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="color-row">
+      <span class="param-name">Prefix color</span>
+      <input id="cAnnotTitle" type="color" value="#e8e8e8" />
+    </div>
+    <div class="param-row">
+      <span class="param-name">Prefix size</span>
+      <input id="pAnnotPrefixSz" type="range" min="8" max="24" step="0.5" value="15" />
+      <span class="param-val" id="pAnnotPrefixSzVal">13</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Prefix weight</span>
+      <input id="pAnnotPrefixWt" type="range" min="300" max="800" step="100" value="800" />
+      <span class="param-val" id="pAnnotPrefixWtVal">700</span>
+    </div>
+    <div class="color-row">
+      <span class="param-name">Sentence color</span>
+      <input id="cAnnotSent" type="color" value="#e8e8e8" />
+    </div>
+    <div class="param-row">
+      <span class="param-name">Sentence size</span>
+      <input id="pAnnotSentSz" type="range" min="8" max="24" step="0.5" value="13" />
+      <span class="param-val" id="pAnnotSentSzVal">13</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Sentence weight</span>
+      <input id="pAnnotSentWt" type="range" min="300" max="800" step="100" value="500" />
+      <span class="param-val" id="pAnnotSentWtVal">600</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Line height</span>
+      <input id="pAnnotLineH" type="range" min="1.0" max="2.2" step="0.05" value="1.45" />
+      <span class="param-val" id="pAnnotLineHVal">1.45</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Number size</span>
+      <input id="pAnnotDeltaSz" type="range" min="8" max="32" step="0.5" value="20" />
+      <span class="param-val" id="pAnnotDeltaSzVal">14</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">Corner radius</span>
+      <input id="pAnnotRadius" type="range" min="0" max="24" step="1" value="12" />
+      <span class="param-val" id="pAnnotRadiusVal">12</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="action-row">
+    <button id="flyBtn" class="btn">Fly ✦</button>
+    <button id="sandBtn" class="btn on">Sand</button>
+    <button id="compare" class="btn">Compare</button>
+  </div>
+  <div class="action-row">
+    <button id="copyBtn" class="btn">Copy all</button>
+  </div>
+
+  <p class="status" id="status">loading font…</p>
+</aside>
+
+<script>
+(async () => {
+  const NS = 'http://www.w3.org/2000/svg';
+
+  let   FONT_SIZE     = 200;
+  let   manualFontSize = null;          // null = auto-fit (original behavior); number = user override
+  let   currentFontKey = 'inter';       // active font family key
+  let   currentWeight  = 400;           // active font weight
+  let   cssFontKey     = 'inter';       // suffix used for the registered FontFace family (__kern_<cssFontKey>)
+  const BASELINE_Y    = 290;
+  const VIEWBOX_W     = 1400;
+  const VIEWBOX_H     = 420;
+  let   FLOOR_SVG_Y   = 367;
+  const FLATTEN_STEPS = 20;
+  const Y_STEP        = 1;
+  const MIN_CLEARANCE = 2;
+  let dotColor        = '#8d7c81';
+  let typeColor       = '#c2fbff';
+  let bgColor         = '#3e1824';
+  let labelColor      = '#c2fbff';
+  let connectorColor   = '#c2fbff';   // color for gap→label/floor connector lines
+  let connectorWeight  = 1.5;         // px (0 = hidden)
+  let connectorOpacity = 0.22;        // max opacity of connector line
+  let floorSpread      = 0.045;       // horizontal spread multiplier for floor dot cluster
+  let floorScatter     = 80;          // vertical scatter (yOff range) for floor dots
+  let matchDensity     = true;        // when true: more dots → taller cluster, not denser
+
+  const CDN = 'https://cdn.jsdelivr.net/gh/google/fonts@main/';
+  const FONTS = {
+    // Sans-Serif
+    inter:             CDN + 'ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf',
+    roboto:            CDN + 'apache/roboto/fonts/ttf/Roboto-Regular.ttf',
+    opensans:          CDN + 'ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf',
+    lato:              CDN + 'ofl/lato/Lato-Regular.ttf',
+    montserrat:        CDN + 'ofl/montserrat/Montserrat%5Bwght%5D.ttf',
+    raleway:           CDN + 'ofl/raleway/Raleway%5Bwght%5D.ttf',
+    nunito:            CDN + 'ofl/nunito/Nunito%5Bwght%5D.ttf',
+    dmsans:            CDN + 'ofl/dmsans/DMSans%5Bopsz%2Cwght%5D.ttf',
+    spacegrotesk:      CDN + 'ofl/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf',
+    oswald:            CDN + 'ofl/oswald/Oswald%5Bwght%5D.ttf',
+    // Serif
+    instrumentserif:   CDN + 'ofl/instrumentserif/InstrumentSerif-Regular.ttf',
+    playfairdisplay:   CDN + 'ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf',
+    merriweather:      CDN + 'ofl/merriweather/Merriweather-Regular.ttf',
+    lora:              CDN + 'ofl/lora/Lora%5Bwght%5D.ttf',
+    cormorantgaramond: CDN + 'ofl/cormorantgaramond/CormorantGaramond-Regular.ttf',
+    dmserifdisplay:    CDN + 'ofl/dmserifdisplay/DMSerifDisplay-Regular.ttf',
+    librebaskerville:  CDN + 'ofl/librebaskerville/LibreBaskerville-Regular.ttf',
+    ebgaramond:        CDN + 'ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf',
+    // Display
+    anton:             CDN + 'ofl/anton/Anton-Regular.ttf',
+    abrilfatface:      CDN + 'ofl/abrilfatface/AbrilFatface-Regular.ttf',
+    righteous:         CDN + 'ofl/righteous/Righteous-Regular.ttf',
+    pacifico:          CDN + 'ofl/pacifico/Pacifico-Regular.ttf',
+  };
+
+  // ── state ──────────────────────────────────────────────
+  let currentFont      = null;
+  let fontMetrics      = null;
+  let activeAlgo       = 'optical';
+  let showSand         = true;
+  let tracking         = 0;
+  let letterData       = [];
+  let algoPositions    = {};
+  let displayPositions = [];
+  let letterEls        = [];
+  let gapParticles     = [];   // [{y, xFrac}] per gap, sorted bottom-up
+  let annotCardParticles = []; // falling dots for annotation cards, rendered on annotCanvas
+  let gapDefaultCounts  = [];  // particle count per gap at default positions (for delta labels)
+  let gapOpticalCounts  = [];  // particle count per gap at optical positions (stable reference for tooltip)
+  let dotDensity       = 0;   // dots per unit pool area at default layout — fixed reference so delta = f(pixel gap change)
+  let floorParticles   = [];   // per-gap arrays of dots sitting at floor for negative-delta gaps
+  let particlePhases   = [];   // [{phase, freq}] per gap, per particle
+  let gapLabelState    = [];   // [{sinkStartMs?, riseStartMs?}] per gap for label Y animation
+  let comparing        = false;
+  let loopRaf          = null;  // single continuous RAF
+  let animStartTime    = null;  // null when idle
+  let animFrom         = [];
+  let animTarget       = [];
+  let animDuration     = 1200;
+  let animResolve      = null;
+  let sandT            = 1;     // fill progress 0→1 (stays 1 when settled)
+  let fillAnimStartMs  = 0;     // >0 only when animated fill is running
+  let lastTrackTime    = -10;   // seconds, for tracking shake
+  let dotSize    = 0.8;
+  let dotCount   = 4100;
+  let dotSpeed   = 4.5;
+  let dotAmp     = 3.5;
+  let dotOpacity = 1.0;
+
+  // gap tooltip hit areas — repopulated each frame
+  let labelHitAreas = [];
+  let hoveredGapIdx = -1;
+  let hoverOpacity  = 0;   // 0=normal, 1=non-active fully dimmed
+
+  // motion
+  let seqSpeed   = 1.0;
+  let fallGravity = 0.7;
+  let fallDrift   = 90;
+  let fallWobble  = 22;
+  let fallMagnet  = 0.7;
+
+  // fly-in animation (old, kept for drawFlyLayer)
+  let flyActive       = false;
+  let flyLetters      = [];   // letterData indices of capitals
+  let flyParticles    = [];   // per capital: [{startX,startY,targetX,targetY,phase}]
+  let flyStartMs      = 0;
+  const FLY_DUR       = 1100; // ms per letter fill
+  const FLY_FADE      = 350;  // ms to fade SVG letter back in
+
+  // sequential gap animation
+  let seqActive      = false;
+  let seqStartMs     = 0;
+  let seqFloorPos    = [];
+  let seqOptPos      = [];
+  let seqDeltas      = [];    // per gap: optical gap width minus floor gap width
+  let seqGapFill     = null; // null = use sandT; array = per-gap progress 0→1
+  let seqAutoOptical = false; // when true, boot seq fires transitionAlgo('optical') on completion
+  let animPosOnly    = false; // true = position animation doesn't drive sandT
+  let pendingTransTimers = []; // setTimeout IDs from transitionAlgo — cleared on rebuild
+  let transitionBusy    = false; // true while pink/green dot animation is running — blocks hover
+  // annotation card style
+  let annotNegColor   = '#ff70fa';
+  let annotPosColor   = '#8aff99';
+  let annotRiskColor  = '#ff884d';
+  let annotDotColor   = '#9a6071';
+  let annotDeltaSz    = 20;
+  let annotCardBgHex  = '#210d13';
+  let annotCardBgOp   = 0.95;
+  let annotBorderHex  = '#333333';
+  let annotCardPad    = 16;
+  let annotCardMargin = 14;
+  let annotShadow     = 15;
+  let annotFontFamily = '"__annot_af-inter", Inter, sans-serif';
+  let annotPrefixSz   = 15;
+  let annotPrefixWt   = 800;
+  let annotSentHex    = '#e8e8e8';
+  let annotSentSz     = 13;
+  let annotSentWt     = 500;
+  let annotLineH      = 1.45;
+  let annotCardRadius = 12;
+  // legacy alias so any remaining references don't break
+  let annotTitleHex   = '#e8e8e8';
+  let annotTitleSz    = 13;
+
+  let canvasEditMode = false;
+  let cursorPos      = 0;
+  let wordSelected   = false;
+  const SEQ_GAP_DUR  = 1200; // ms to fill each gap (interactive seq button)
+  const SEQ_GAP_STEP =  480; // ms between gap start times (interactive seq button)
+  let seqGapDurMs  = SEQ_GAP_DUR;  // overridable per-session
+  let seqGapStepMs = SEQ_GAP_STEP;
+
+  function hexRgb(hex) {
+    const n = parseInt(hex.replace('#',''), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  // ── DOM ────────────────────────────────────────────────
+  const stage       = document.getElementById('stage');
+  const lettersLayer = document.getElementById('lettersLayer');
+  const svgCursor    = document.getElementById('svgCursor');
+  const svgSelection = document.getElementById('svgSelection');
+  const canvasWrap  = document.querySelector('.canvas-wrap');
+  const canvas      = document.getElementById('particles');
+  const ctx         = canvas.getContext('2d');
+  const annotCanvas = document.getElementById('annotCanvas');
+  const annotCtx    = annotCanvas.getContext('2d');
+  const wordInput   = document.getElementById('word');
+  const fontSelect  = document.getElementById('font');
+  const algoBtns    = document.querySelectorAll('.algo-btn');
+  const sandBtn     = document.getElementById('sandBtn');
+  const compareBtn  = document.getElementById('compare');
+  const trackingInput = document.getElementById('tracking');
+  const trackingVal   = document.getElementById('trackingVal');
+  const statusEl    = document.getElementById('status');
+
+  // ── canvas sizing ─────────────────────────────────────
+  function resizeCanvas() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    if (r.width === 0) return;
+    canvas.width  = annotCanvas.width  = Math.round(r.width  * devicePixelRatio);
+    canvas.height = annotCanvas.height = Math.round(r.height * devicePixelRatio);
+  }
+  new ResizeObserver(resizeCanvas).observe(canvas.parentElement);
+  resizeCanvas();
+
+  function toCanvasPt(svgX, svgY) {
+    const sr = stage.getBoundingClientRect();
+    const cr = canvas.getBoundingClientRect();
+    const sx = sr.width  / VIEWBOX_W * devicePixelRatio;
+    const sy = sr.height / VIEWBOX_H * devicePixelRatio;
+    const ox = (sr.left - cr.left) * devicePixelRatio;
+    const oy = (sr.top  - cr.top)  * devicePixelRatio;
+    return [ox + svgX * sx, oy + svgY * sy];
+  }
+  function pxPerSvg() {
+    return stage.getBoundingClientRect().width / VIEWBOX_W * devicePixelRatio;
+  }
+
+  // ── font ──────────────────────────────────────────────
+  const fontCache = {};
+  const fontFaceCache = {};
+  function loadFont(key) {
+    if (fontCache[key]) return Promise.resolve(fontCache[key]);
+    return new Promise((res, rej) => {
+      opentype.load(FONTS[key], async (err, font) => {
+        if (err) { rej(err); return; }
+        fontCache[key] = font;
+        if (!fontFaceCache[key]) {
+          try {
+            const face = new FontFace(`__kern_${key}`, `url(${FONTS[key]})`);
+            await face.load();
+            document.fonts.add(face);
+            fontFaceCache[key] = true;
+          } catch (e) { /* canvas measureText falls back gracefully */ }
+        }
+        cssFontKey = key;
+        res(font);
+      });
+    });
+  }
+
+  // ── weighted font loading (per-weight static TTFs from Fontsource) ──
+  // opentype.js renders only a variable font's default instance, so real weight
+  // selection needs distinct static TTF files. Fontsource serves parseable TTFs.
+  const FONTSOURCE_SLUG = {
+    inter:'inter', roboto:'roboto', opensans:'open-sans', lato:'lato',
+    montserrat:'montserrat', raleway:'raleway', nunito:'nunito', dmsans:'dm-sans',
+    spacegrotesk:'space-grotesk', oswald:'oswald',
+    instrumentserif:'instrument-serif', playfairdisplay:'playfair-display',
+    merriweather:'merriweather', lora:'lora', cormorantgaramond:'cormorant-garamond',
+    dmserifdisplay:'dm-serif-display', librebaskerville:'libre-baskerville',
+    ebgaramond:'eb-garamond', anton:'anton', abrilfatface:'abril-fatface',
+    righteous:'righteous', pacifico:'pacifico',
+  };
+  // Families that only ship weight 400 (verified 404 on others) — weight is locked.
+  const SINGLE_WEIGHT = new Set(['anton','abrilfatface','righteous','pacifico']);
+  const fontsourceUrl = (key, weight) =>
+    `https://cdn.jsdelivr.net/fontsource/fonts/${FONTSOURCE_SLUG[key]}@latest/latin-${weight}-normal.ttf`;
+
+  const weightFontCache = {};      // opentype fonts keyed `${key}:${weight}`
+  const weightFaceCache = {};      // registered FontFace families
+
+  // Loads `key` at `weight`. weight 400 reuses the original file/look (loadFont).
+  // Sets cssFontKey to the family suffix to use for measureText/word input.
+  function loadFontWeighted(key, weight) {
+    if (weight === 400 || SINGLE_WEIGHT.has(key)) {
+      return loadFont(key); // loadFont sets cssFontKey = key
+    }
+    const ck = `${key}:${weight}`;
+    if (weightFontCache[ck]) { cssFontKey = `${key}__${weight}`; return Promise.resolve(weightFontCache[ck]); }
+    const url = fontsourceUrl(key, weight);
+    return new Promise((res, rej) => {
+      opentype.load(url, async (err, font) => {
+        if (err) { rej(err); return; }
+        weightFontCache[ck] = font;
+        const fam = `${key}__${weight}`;
+        if (!weightFaceCache[fam]) {
+          try {
+            const face = new FontFace(`__kern_${fam}`, `url(${url})`);
+            await face.load();
+            document.fonts.add(face);
+            weightFaceCache[fam] = true;
+          } catch (e) { /* measureText falls back gracefully */ }
+        }
+        cssFontKey = fam;
+        res(font);
+      });
+    });
+  }
+
+  // Applies the current font+weight: loads, swaps currentFont, re-kerns.
+  // Falls back to weight 400 if the requested weight is unavailable (404).
+  async function applyFontWeight() {
+    statusEl.textContent = 'loading…';
+    statusEl.classList.remove('error');
+    try {
+      currentFont = await loadFontWeighted(currentFontKey, currentWeight);
+    } catch (e) {
+      currentWeight = 400;
+      try { currentFont = await loadFontWeighted(currentFontKey, 400); }
+      catch (e2) { statusEl.textContent = `failed: ${e2.message || e2}`; statusEl.classList.add('error'); return; }
+      if (typeof syncCustomWeight === 'function') syncCustomWeight();
+    }
+    fontMetrics = computeFontMetrics(currentFont);
+    applyWordInputFont();
+    await rebuild(false);
+    statusEl.classList.remove('error');
+  }
+
+  // ── glyph processing ──────────────────────────────────
+  function flatten(otPath) {
+    const contours = [];
+    let cur = [], cx = 0, cy = 0, sx = 0, sy = 0;
+    for (const cmd of otPath.commands) {
+      if (cmd.type === 'M') {
+        if (cur.length) contours.push(cur);
+        cur = [{ x: cmd.x, y: cmd.y }];
+        cx = sx = cmd.x; cy = sy = cmd.y;
+      } else if (cmd.type === 'L') {
+        cur.push({ x: cmd.x, y: cmd.y }); cx = cmd.x; cy = cmd.y;
+      } else if (cmd.type === 'C') {
+        for (let i = 1; i <= FLATTEN_STEPS; i++) {
+          const t = i / FLATTEN_STEPS, u = 1 - t;
+          cur.push({
+            x: u*u*u*cx + 3*u*u*t*cmd.x1 + 3*u*t*t*cmd.x2 + t*t*t*cmd.x,
+            y: u*u*u*cy + 3*u*u*t*cmd.y1 + 3*u*t*t*cmd.y2 + t*t*t*cmd.y
+          });
+        }
+        cx = cmd.x; cy = cmd.y;
+      } else if (cmd.type === 'Q') {
+        for (let i = 1; i <= FLATTEN_STEPS; i++) {
+          const t = i / FLATTEN_STEPS, u = 1 - t;
+          cur.push({
+            x: u*u*cx + 2*u*t*cmd.x1 + t*t*cmd.x,
+            y: u*u*cy + 2*u*t*cmd.y1 + t*t*cmd.y
+          });
+        }
+        cx = cmd.x; cy = cmd.y;
+      } else if (cmd.type === 'Z') {
+        cur.push({ x: sx, y: sy }); contours.push(cur); cur = [];
+      }
+    }
+    if (cur.length) contours.push(cur);
+    return contours;
+  }
+
+  function buildEdges(contours, yMin, yMax) {
+    const n = Math.max(1, Math.ceil((yMax - yMin) / Y_STEP) + 1);
+    const L = new Array(n).fill(null), R = new Array(n).fill(null);
+    for (let r = 0; r < n; r++) {
+      const y = yMin + r * Y_STEP;
+      let lx = Infinity, rx = -Infinity, any = false;
+      for (const c of contours) {
+        for (let i = 0; i < c.length - 1; i++) {
+          const p1 = c[i], p2 = c[i+1];
+          if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y)) {
+            const t = (y - p1.y) / (p2.y - p1.y);
+            const x = p1.x + t * (p2.x - p1.x);
+            if (x < lx) lx = x;
+            if (x > rx) rx = x;
+            any = true;
+          }
+        }
+      }
+      if (any) { L[r] = lx; R[r] = rx; }
+    }
+    // Near-horizontal strokes at the top/bottom of a glyph produce no crossings,
+    // leaving null scanlines. Propagate nearest valid value to fill those gaps.
+    let ll = null, rl = null;
+    for (let r = 0; r < n; r++) {
+      if (L[r] !== null) ll = L[r]; else if (ll !== null) L[r] = ll;
+      if (R[r] !== null) rl = R[r]; else if (rl !== null) R[r] = rl;
+    }
+    ll = null; rl = null;
+    for (let r = n - 1; r >= 0; r--) {
+      if (L[r] !== null) ll = L[r]; else if (ll !== null) L[r] = ll;
+      if (R[r] !== null) rl = R[r]; else if (rl !== null) R[r] = rl;
+    }
+    return { L, R, yMin, n };
+  }
+
+  function measureGlyph(char, font) {
+    const glyph = font.charToGlyph(char);
+    const advance = glyph.advanceWidth * (FONT_SIZE / font.unitsPerEm);
+    if (char === ' ' || char === ' ') {
+      return { char, isSpace: true, advance, inkLeft: 0, inkRight: 0,
+               inkTop: BASELINE_Y - FONT_SIZE * 0.5, inkBottom: BASELINE_Y };
+    }
+    const path     = glyph.getPath(0, BASELINE_Y, FONT_SIZE);
+    const contours = flatten(path);
+    if (!contours.length || contours.every(c => c.length < 2)) {
+      return { char, isSpace: true, advance, inkLeft: 0, inkRight: 0,
+               inkTop: BASELINE_Y, inkBottom: BASELINE_Y };
+    }
+    let inkLeft = Infinity, inkRight = -Infinity, inkTop = Infinity, inkBottom = -Infinity;
+    for (const c of contours) for (const p of c) {
+      if (p.x < inkLeft)   inkLeft   = p.x;
+      if (p.x > inkRight)  inkRight  = p.x;
+      if (p.y < inkTop)    inkTop    = p.y;
+      if (p.y > inkBottom) inkBottom = p.y;
+    }
+    const profile = buildEdges(contours, Math.floor(inkTop), Math.ceil(inkBottom));
+    return {
+      char, isSpace: false, glyph, advance,
+      svg: path.toPathData(2),
+      contours,
+      L: profile.L, R: profile.R, yMin: profile.yMin, n: profile.n,
+      inkLeft, inkRight, inkTop, inkBottom
+    };
+  }
+
+  function inkRightAt(d, y) {
+    const r = Math.round((y - d.yMin) / Y_STEP);
+    if (r < 0 || r >= d.n) return null;
+    return d.R[r];
+  }
+  function inkLeftAt(d, y) {
+    const r = Math.round((y - d.yMin) / Y_STEP);
+    if (r < 0 || r >= d.n) return null;
+    return d.L[r];
+  }
+
+  // ── kerning math ──────────────────────────────────────
+  function poolArea(a, b, dx) {
+    if (a.isSpace || b.isSpace) return 0;
+    const yMin = Math.ceil(Math.max(a.inkTop, b.inkTop));
+    const yMax = Math.floor(Math.min(a.inkBottom, b.inkBottom));
+    if (yMax <= yMin) return 0;
+    let area = 0;
+    for (let y = yMin; y <= yMax; y += Y_STEP) {
+      const aR = inkRightAt(a, y), bL = inkLeftAt(b, y);
+      if (aR == null || bL == null) continue;
+      const gap = dx + bL - aR;
+      if (gap > 0) area += gap * Y_STEP;
+    }
+    return area;
+  }
+
+  function minNoOverlapDx(a, b) {
+    const yMin = Math.ceil(Math.max(a.inkTop, b.inkTop));
+    const yMax = Math.floor(Math.min(a.inkBottom, b.inkBottom));
+    let mc = -Infinity;
+    for (let y = yMin; y <= yMax; y += Y_STEP) {
+      const aR = inkRightAt(a, y), bL = inkLeftAt(b, y);
+      if (aR == null || bL == null) continue;
+      const c = aR - bL;
+      if (c > mc) mc = c;
+    }
+    return (mc === -Infinity ? 0 : mc) + MIN_CLEARANCE;
+  }
+
+  function optimalDx(a, b, target) {
+    if (a.isSpace || b.isSpace) return a.advance;
+    const dxMin = minNoOverlapDx(a, b);
+    if (poolArea(a, b, dxMin) >= target) return dxMin;
+    let lo = dxMin, hi = dxMin + 50, safe = 0;
+    while (poolArea(a, b, hi) < target && safe++ < 12) hi += 200;
+    for (let i = 0; i < 22; i++) {
+      const mid = (lo + hi) / 2;
+      poolArea(a, b, mid) < target ? (lo = mid) : (hi = mid);
+    }
+    return (lo + hi) / 2;
+  }
+
+  // ── optical (weighted) algorithm ──────────────────────
+  function computeFontMetrics(font) {
+    const xg = measureGlyph('x', font), ng = measureGlyph('n', font);
+    return { xH: xg.inkBottom - xg.inkTop, xTop: xg.inkTop, xBot: xg.inkBottom, nGlyph: ng };
+  }
+
+  function heightWeight(y, m) {
+    const mu = (m.xTop + m.xBot) / 2, sig = (m.xBot - m.xTop) * 0.55, d = y - mu;
+    return Math.exp(-(d * d) / (2 * sig * sig));
+  }
+
+  function weightedPoolArea(a, b, dx, m) {
+    if (a.isSpace || b.isSpace) return 0;
+    const yMin = Math.ceil(Math.max(a.inkTop, b.inkTop));
+    const yMax = Math.floor(Math.min(a.inkBottom, b.inkBottom));
+    if (yMax <= yMin) return 0;
+    let area = 0;
+    for (let y = yMin; y <= yMax; y += Y_STEP) {
+      const aR = inkRightAt(a, y), bL = inkLeftAt(b, y);
+      if (aR == null || bL == null) continue;
+      const gap = dx + bL - aR;
+      if (gap > 0) area += gap * heightWeight(y, m) * Y_STEP;
+    }
+    return area;
+  }
+
+  function opticalTarget(m) {
+    const n = m.nGlyph, dxRef = minNoOverlapDx(n, n) + m.xH * 0.14;
+    return weightedPoolArea(n, n, dxRef, m);
+  }
+
+  function dxForWeightedTarget(a, b, target, dxFloor, m) {
+    if (weightedPoolArea(a, b, dxFloor, m) >= target) return dxFloor;
+    let lo = dxFloor, hi = dxFloor + 60, safe = 0;
+    while (weightedPoolArea(a, b, hi, m) < target && safe++ < 12) hi += 200;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      weightedPoolArea(a, b, mid, m) < target ? (lo = mid) : (hi = mid);
+    }
+    return (lo + hi) / 2;
+  }
+
+  // ── layout ────────────────────────────────────────────
+  function computeLayout(text, font, _skipResize) {
+    if (!_skipResize) FONT_SIZE = manualFontSize != null ? manualFontSize : 200; // reset reference each word so sizing is consistent
+    if (!_skipResize && manualFontSize != null) FLOOR_SVG_Y = Math.min(390, Math.round(BASELINE_Y + 0.385 * FONT_SIZE));
+    letterData    = Array.from(text).map(ch => measureGlyph(ch, font));
+    algoPositions = {};
+    if (!letterData.length) return;
+    fontMetrics = computeFontMetrics(font);
+
+    // Default — browser canvas measureText with full GPOS kern (matches Figma)
+    const tmpCv = document.createElement('canvas');
+    const tmpCtx = tmpCv.getContext('2d');
+    tmpCtx.font = `${FONT_SIZE}px "__kern_${cssFontKey}"`;
+    const def = [];
+    for (let i = 0; i < text.length; i++) {
+      // position of letter i = advance of all preceding letters with kerning applied
+      // = measureText(text[0..i]).width - measureText(text[i]).width
+      const pos = i === 0 ? 0
+        : tmpCtx.measureText(text.slice(0, i + 1)).width - tmpCtx.measureText(text[i]).width;
+      def.push(pos + i * tracking);
+    }
+    algoPositions.default = def;
+
+    // Optical
+    const optTgt = opticalTarget(fontMetrics), fc = fontMetrics.xH * 0.08;
+    const optical = [0];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const a = letterData[i], b = letterData[i+1];
+      const dx = (a.isSpace || b.isSpace) ? a.advance
+        : dxForWeightedTarget(a, b, optTgt, minNoOverlapDx(a, b) + fc, fontMetrics);
+      optical.push(optical[i] + dx + tracking);
+    }
+    algoPositions.optical = optical;
+
+    // ── responsive sizing: scale FONT_SIZE so optical word ≈ 70% of VIEWBOX_W ──
+    if (!_skipResize && manualFontSize == null && letterData.length > 0) {
+      const first0 = letterData[0], last0 = letterData[letterData.length - 1];
+      const le = optical[0] + (first0.isSpace ? 0 : first0.inkLeft);
+      const re = optical[optical.length - 1] + (last0.isSpace ? last0.advance : last0.inkRight);
+      const wordWidth = re - le;
+      if (wordWidth > 0) {
+        // Also clamp so the tallest ascender stays >= 10px below the viewBox top
+        const minInkTop = Math.min(...letterData.filter(d => !d.isSpace).map(d => d.inkTop));
+        const ascenderH = BASELINE_Y - minInkTop;
+        const maxFSVert = ascenderH > 0 ? FONT_SIZE * (BASELINE_Y - 10) / ascenderH : 400;
+        const newFS = Math.max(60, Math.min(400, maxFSVert, FONT_SIZE * 0.70 * VIEWBOX_W / wordWidth));
+        if (Math.abs(newFS - FONT_SIZE) > 2) {
+          FONT_SIZE = newFS;
+          FLOOR_SVG_Y = Math.min(390, Math.round(BASELINE_Y + 0.385 * FONT_SIZE));
+          computeLayout(text, font, true);
+          return;
+        }
+      }
+    }
+  }
+
+  function centered(positions) {
+    if (!positions.length) return [];
+    const first = letterData[0], last = letterData[letterData.length - 1];
+    const le = positions[0] + (first.isSpace ? 0 : first.inkLeft);
+    const re = positions[positions.length-1] + (last.isSpace ? last.advance : last.inkRight);
+    const off = (VIEWBOX_W - (re - le)) / 2 - le;
+    return positions.map(p => p + off);
+  }
+
+  // ── SVG letters ───────────────────────────────────────
+  function setupElements() {
+    lettersLayer.innerHTML = '';
+    letterEls = [];
+    for (const d of letterData) {
+      if (d.isSpace) { letterEls.push(null); continue; }
+      const el = document.createElementNS(NS, 'path');
+      el.setAttribute('d', d.svg);
+      el.setAttribute('fill', typeColor);
+      el.style.transition = 'opacity 0.25s ease';
+      lettersLayer.appendChild(el);
+      letterEls.push(el);
+    }
+  }
+
+  function updateCursorEl() {
+    const word = wordInput.value;
+    const clampedPos = Math.min(cursorPos, word.length);
+    if (clampedPos !== cursorPos) cursorPos = clampedPos;
+
+    if (!canvasEditMode) {
+      svgCursor.setAttribute('display', 'none');
+      svgSelection.setAttribute('display', 'none');
+      return;
+    }
+
+    // Height: full ink range of the word (fallback to cap-height estimate when word is empty)
+    const inked = letterData.filter(d => !d.isSpace);
+    const curTop = inked.length ? Math.min(...inked.map(d => d.inkTop))    : BASELINE_Y - FONT_SIZE * 0.8;
+    const curBot = inked.length ? Math.max(...inked.map(d => d.inkBottom)) : BASELINE_Y;
+
+    // Selection highlight
+    if (wordSelected && inked.length && displayPositions.length) {
+      svgCursor.setAttribute('display', 'none');
+      const pos = centered(displayPositions);
+      const first = letterData[0], last = letterData[letterData.length - 1];
+      const selL = pos[0] + (first.isSpace ? 0 : first.inkLeft);
+      const selR = pos[letterData.length - 1] + (last.isSpace ? last.advance : last.inkRight);
+      svgSelection.setAttribute('x', selL.toFixed(1));
+      svgSelection.setAttribute('y', curTop.toFixed(1));
+      svgSelection.setAttribute('width', Math.max(0, selR - selL).toFixed(1));
+      svgSelection.setAttribute('height', (curBot - curTop).toFixed(1));
+      svgSelection.setAttribute('fill', typeColor);
+      svgSelection.removeAttribute('display');
+      return;
+    }
+    svgSelection.setAttribute('display', 'none');
+
+    // Cursor — always shown while canvas is focused, even with empty word
+    let cx;
+    if (!letterData.length || !displayPositions.length) {
+      cx = VIEWBOX_W / 2;
+    } else {
+      const pos = centered(displayPositions);
+      if (cursorPos === 0) {
+        const first = letterData[0];
+        cx = (first && !first.isSpace ? pos[0] + first.inkLeft : pos[0]) - 3;
+      } else if (cursorPos >= letterData.length) {
+        const last = letterData[letterData.length - 1];
+        cx = (last && !last.isSpace ? pos[letterData.length - 1] + last.inkRight : pos[letterData.length - 1] + last.advance) + 2;
+      } else {
+        const prev = letterData[cursorPos - 1], cur = letterData[cursorPos];
+        const prevR = prev && !prev.isSpace ? pos[cursorPos - 1] + prev.inkRight : pos[cursorPos - 1] + (prev ? prev.advance : 0);
+        const curL  = cur  && !cur.isSpace  ? pos[cursorPos]     + cur.inkLeft  : pos[cursorPos];
+        cx = (prevR + curL) / 2;
+      }
+    }
+    svgCursor.setAttribute('x', (cx - 0.75).toFixed(1));
+    svgCursor.setAttribute('y', curTop.toFixed(1));
+    svgCursor.setAttribute('height', (curBot - curTop).toFixed(1));
+    svgCursor.removeAttribute('display');
+  }
+
+  function updateRender(positions) {
+    const pos = centered(positions);
+    for (let i = 0; i < letterData.length; i++) {
+      if (letterEls[i]) letterEls[i].setAttribute('transform', `translate(${pos[i].toFixed(2)},0)`);
+    }
+    updateCursorEl();
+  }
+
+  // ── PRNG (mulberry32) ─────────────────────────────────
+  function mkRng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // ── pair descriptions ─────────────────────────────────
+  function shapeClass(ch) {
+    if ('AKVWXYZakvwxyz'.includes(ch)) return 'diagonal';
+    if ('BCDGOPQRSUbcdegopqrsu'.includes(ch)) return 'round';
+    return 'straight';
+  }
+  const PAIR_DESCS = {
+    'diagonal+round':    'A diagonal stroke leaning into a curved bowl. The slope closes the gap optically — the two forms fit like ramp and arch, requiring less physical space than the number implies.',
+    'round+diagonal':    'A curved exit launching into a diagonal. The round gives back space on departure; the diagonal opens on arrival — together they need careful balancing so neither side dominates.',
+    'diagonal+straight': 'A sloped stroke beside a vertical wall. The diagonal\'s descending angle creates more air near the top of the pair than the bottom — the gap is narrower where the eye least expects it.',
+    'straight+diagonal': 'A flat stem entering a diagonal. The optical void appears at the top of the pairing where the diagonal pulls away from the stem — watch that the cap-height gap doesn\'t read as a hole.',
+    'round+round':       'Two curved forms sharing a boundary. Rounds push their visual weight inward, meaning the physical gap needs to be smaller than it looks — the curves give back space that a straight wall would keep.',
+    'round+straight':    'A curved exit walking into a flat wall. The round\'s optical recession means less physical space is needed to read as equal, but the straight stem holds its ground — a modest tighten keeps the rhythm.',
+    'straight+round':    'A flat wall stepping toward a curved form. The curve recedes from the stem — close the gap slightly so the round doesn\'t drift away from its neighbor.',
+    'straight+straight': 'Two vertical walls facing each other. This is the reference pair — the spacing here sets the tempo that every other pair in the word must visually match.',
+    'diagonal+diagonal': 'Two sloped strokes meeting. Their angles converge in the middle of the gap, sometimes nearly touching. Often needs negative kern — the optical closing is much stronger than the measured distance suggests.',
+  };
+  const SPECIFIC_PAIRS = {
+    // n pairings
+    'ni': "n's final arch sweeps down on a slight inward curve — not a true flat exit. That curved descent forces a hair more clearance than a purely vertical stem would need, which is why ni lands above the straight-straight baseline.",
+    'in': "i's clean stem walks into n's arched shoulder with minimal waste. Two near-parallel verticals bookend the gap; the arch's slight inset makes this read tighter than the raw dot count suggests.",
+    'rn': "The notorious pair — r's arm leaves a shelf of dead air that combines with n's arched entry to form a closed counter the brain can misread as 'm'. Too tight risks the illusion; too loose breaks the rhythm. The dot count lands exactly at the edge of that zone.",
+    'nr': "n's arch exits descending, then r's arm juts right. The upper half of the gap is capped by the arm; the lower half opens freely. That vertical asymmetry — tight at top, airy at bottom — is why this pair demands attention despite looking straightforward.",
+    'nu': "n exits with an arch curl; u enters with a matching arch curl. The mirrored profiles nearly cancel each other's optical weight — the space feels smaller than it measures because both curves reach toward each other.",
+    'un': "u's round exit flows into n's round entry with near-mirror symmetry. The arch profiles echo each other, giving the eye a natural visual bridge across the gap.",
+    'nt': "n's arch descends cleanly to the baseline before t's crossbar bridges overhead at x-height. That bar draws the eye upward, making the pair feel more closed than the stem spacing alone would suggest.",
+    'tn': "t's crossbar reaches leftward just as n's arch begins its shoulder. The bar floats above the actual spacing zone — the stems below are the true anchor, the bar is a visual bonus.",
+    'ri': "r's arm leaves a ledge of empty air before meeting i's stem. The shelf reads wider than the stems' true distance, because the eye expects something to fill it. Tighten until the arm and stem feel connected.",
+    'ir': "i's stem steps into r's arm zone immediately — the arm begins almost at i's exit height. Top of the gap reads naturally tight; the open space is concentrated in the lower zone under the arm.",
+    'ra': "r's arm points over a's round shoulder, creating more air at the top of the gap than the bottom. a's curve fills the lower zone nicely, but the arm shelf overhead is the problem — tighten to balance top and bottom.",
+    'ar': "a's round exit curls toward r's arm undercut. The curve fills the lower gap; the arm defines the ceiling. The two forms share the gap vertically, which is why the dot count is lower than a to a straight wall.",
+    'er': "e's open aperture exits into r's oblique arm. The arm carves a triangular void — tight at the top where arm meets e's midbar, airy below. One of the most asymmetric negative spaces in lowercase.",
+    're': "r's arm exits over e's curved back. The arm naturally bridges some air at x-height; e's curve fills the lower zone. Reads looser than it measures because the arm-void is the most visible element.",
+    'rs': "r's arm transitions to s's double curve — two very different shapes at x-height. The arm leaves air in the upper-right corner that s's spine can't fully close. Requires careful eye.",
+    'rt': "r's arm and t's crossbar occur at nearly the same height — a double horizontal shelf. The visual density at mid-height is high; the open space below the bars feels comparatively empty.",
+    'tr': "t's crossbar dips toward r's entry. The two horizontal strokes at similar heights rhyme visually, but the gap below them is open. One of the more optically interesting pairs in running text.",
+    // h pairings
+    'hu': "H's right stem exits dead vertical; u's round opening recedes slightly from it. That recession means less space is needed than two flat walls would demand — but H anchors the rhythm firmly.",
+    'uh': "u's round exit curves into H's straight left stem. The round gives back a small amount of space on departure, slightly reducing the gap needed below the arch.",
+    'hi': "Two verticals with almost no complexity between them. The i's dot sits high above the gap and plays no role in the spacing. This pair, repeated in any word, sets the reference tempo.",
+    'ih': "i's clean stem into H's flat wall. Mirror of hi — the reference width for straight-to-straight spacing in the word.",
+    'he': "H's stem steps toward e's open bowl. The aperture faces the H, and the round recession means slightly less physical gap reads as optically equal to H-to-H.",
+    'eh': "e's open right leads into H's stem. The aperture opens toward the stem, filling the lower gap with curved energy — a comfortable pairing.",
+    'hn': "H exits vertical into n's arched shoulder. The arch slightly recedes compared to a flat stem, so a hair less space suffices — but the visual difference from H-H is subtle.",
+    'ha': "H's stem into a's round body. a's curve recedes from the stem — close the gap slightly to bring the round optically alongside the vertical.",
+    // t pairings
+    'te': "t's crossbar extends past the stem and hangs directly over e's open aperture. The bar and the aperture are nearly at the same height — they bridge the gap optically, allowing a tighter physical distance than nearly any other pair.",
+    'et': "e's open aperture walks into t's stem while the crossbar closes in from above. Both the curve and the bar reach toward each other — a naturally tight pairing.",
+    'to': "t's crossbar floats over o's round crown. Without tightening, o drifts below the bar and reads disconnected. Pull it close so the bar shelters the round rather than hovering above it.",
+    'ot': "o's round exit curves toward t's stem and floating bar. The round recession and the bar overhead both reduce the required gap — a well-balanced pairing.",
+    'ta': "t's bar hovers above a's round shoulder. a's counter catches the bar's visual weight. One of the classic t-overhang pairs — tighten until the bar feels like it belongs to a's space.",
+    'at': "a's round exit into t's stem. The round recedes slightly from the vertical, reducing the gap needed. A moderate, well-behaved pair.",
+    // e pairings
+    'ea': "e exits its open aperture into a's round shoulder. Two rounds side by side — both curves give back space naturally. One of the tighter inter-letter situations in lowercase running text.",
+    'eo': "Two rounds facing each other — e's opening toward o's closed curve. The space is shared evenly; rounds regulate each other well without manual intervention.",
+    // diagonal pairs
+    'AV': "A's right leg and V's left leg tilt toward each other, creating a bright funnel of light between them. Without tightening, this pair reads as a canyon. Most faces need negative kern here — it's the single most notorious pair in type.",
+    'VA': "V's right leg diverges away from A's left leg — the funnel opens in the opposite direction. Same problem as AV, same solution: significant tightening.",
+    'AW': "A's right leg enters W's first diagonal at a complementary angle. The slopes nearly echo each other, reducing the default gap more than in AV — one of the better-behaved diagonal meetings.",
+    'WA': "W's final descending diagonal into A's left leg. The convergence angle is favorable; the gap closes more naturally than the reverse. Still needs tightening, but less dramatically.",
+    'AY': "A's right slope meets Y's left branch. The branches angle toward each other at cap height but diverge below the fork — a funnel shape concentrated at the top of the pair.",
+    // T-overhang
+    'TA': "T's arm overhangs A's sloping left leg. The bar reaches across the gap at cap height, almost closing it visually — but the space below the bar is wide and needs pulling in.",
+    'TO': "T's arm floats above O's crown. O recedes under the bar; without tightening, it looks abandoned below the crossbar. Pull O close enough that the bar appears to shelter it.",
+    'TE': "T's arm aligns with E's top horizontal bar. The two strokes nearly echo each other at cap height — a natural visual bridge. The lower stems still need tightening, but the bars do most of the work.",
+    // L-open
+    'LT': "L's wide open right side faces T's hanging arm — a double channel of horizontal void. Both L's baseline corner and T's bar create dead air simultaneously. One of the worst default-spacing offenders in display type.",
+    'LV': "L's open right into V's left diagonal. The diagonal cuts across L's open field — better than LT but still noticeably loose at the top-right corner of L.",
+    // f pairings
+    'fi': "f's arm extends toward i's stem at the same height. The arm almost closes the gap at x-height — the optical distance is a fraction of the physical one. Many fonts offer a discretionary fi ligature precisely because of this natural closeness.",
+    'ff': "Two f-arms create a double shelf at x-height. Many typefaces ligate ff to merge the arms. Left separate, the two hooks nearly touch — leave just enough space to remain two letters.",
+    // k pairings
+    'Ke': "K's diagonal leg thrusts toward e's curved back. The leg's angle approaches the curve and nearly bridges the gap optically — the diagonal does work that a straight stem couldn't. Fewer dots here than K-to-straight.",
+    'ke': "k's diagonal leg reaches toward e's open aperture. The leg and the aperture meet at mid-height, with the leg almost entering e's counter. Tighten so the leg stays respectfully outside.",
+    // cl trap
+    'cl': "The classic 'cl → d' trap. If these two get too close, the reader's eye merges them into a single 'd'. The dot count here preserves just enough distance to keep both letters unambiguous — go tighter and meaning shifts.",
+    'cd': "c's open right faces d's closed bowl. Enough similarity that over-tightening makes c look like d's failed attempt. The count reflects the minimum safe distance.",
+    // oo
+    'oo': "Two full rounds side by side. Both curves give back space — this pair needs the least physical gap of any same-weight same-height combination. The visual density is high; the dot count should be among the lowest in any word.",
+  };
+  function pairDesc(a, b) {
+    const key = `${a}${b}`;
+    const keyLC = `${a.toLowerCase()}${b.toLowerCase()}`;
+    return SPECIFIC_PAIRS[key] || SPECIFIC_PAIRS[keyLC]
+      || PAIR_DESCS[`${shapeClass(a)}+${shapeClass(b)}`]
+      || 'Optical adjustment needed to keep the visual rhythm even.';
+  }
+
+  // ── particle data ─────────────────────────────────────
+  // Each entry: { y (SVG), xFrac (0–1 across gap at that y) }
+  // Sorted bottom-up (highest y first) so we reveal from bottom as fill grows.
+  function buildGapParticles(gapIdx, count = dotCount, dx = null) {
+    const a = letterData[gapIdx], b = letterData[gapIdx + 1];
+    if (!a || !b || a.isSpace || b.isSpace) return [];
+    const yMin = Math.ceil(Math.max(a.inkTop, b.inkTop));
+    const yMax = Math.floor(Math.min(a.inkBottom, b.inkBottom));
+    if (yMax <= yMin) return [];
+
+    const rng = mkRng(gapIdx * 7919 + 31337);
+    const pts = [];
+    for (let attempt = 0; pts.length < count && attempt < count * 8; attempt++) {
+      const y  = yMin + rng() * (yMax - yMin);
+      const aR = inkRightAt(a, y), bL = inkLeftAt(b, y);
+      if (aR == null || bL == null) { rng(); continue; } // consume xFrac roll to keep sequence stable
+      if (dx !== null && dx + bL - aR <= 0) { rng(); continue; } // gap closed at this y — skip
+      pts.push({ y, xFrac: rng() });
+    }
+    pts.sort((p, q) => q.y - p.y); // bottom-up
+    return pts;
+  }
+
+  function buildAllGapParticles() {
+    gapParticles   = [];
+    particlePhases = [];
+    gapLabelState  = [];
+
+    // Distribute dotCount by actual pool area (gap width × height) at current algorithm spacing
+    const pos = algoPositions[activeAlgo] || algoPositions.default || [];
+    const areas = [];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) { areas.push(0); continue; }
+      const dx = (pos[i + 1] || 0) - (pos[i] || 0);
+      areas.push(Math.max(0, poolArea(a, b, dx)));
+    }
+    const totalArea = areas.reduce((s, a) => s + a, 0) || 1;
+
+    // Compute default-mode counts and fix the density reference.
+    // Both default AND optical counts use the SAME density (dots per unit area at default layout).
+    // This guarantees delta sign = pixel gap direction: wider gap → more dots, tighter → fewer.
+    // Proportional distribution (area/totalArea) breaks this because a large pair shrinking
+    // increases every other gap's proportional share even when those gaps also shrink.
+    const defPos = algoPositions.default || pos;
+    const defAreas = letterData.slice(0, -1).map((a, i) => {
+      const b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) return 0;
+      return Math.max(0, poolArea(a, b, (defPos[i + 1] || 0) - (defPos[i] || 0)));
+    });
+    const defTotal = defAreas.reduce((s, a) => s + a, 0) || 1;
+    dotDensity = dotCount / defTotal;  // fixed reference density
+    gapDefaultCounts = defAreas.map(a => a > 0 ? Math.max(8, Math.round(dotDensity * a)) : 0);
+
+    // Always compute optical counts from optical positions, regardless of current algo
+    const optPos   = algoPositions.optical || defPos;
+    const optAreas = letterData.slice(0, -1).map((a, i) => {
+      const b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) return 0;
+      return Math.max(0, poolArea(a, b, (optPos[i + 1] || 0) - (optPos[i] || 0)));
+    });
+    gapOpticalCounts = optAreas.map(a => a > 0 ? Math.max(8, Math.round(dotDensity * a)) : 0);
+
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const count = areas[i] > 0
+        ? Math.max(8, Math.round(dotDensity * areas[i]))  // fixed density, not proportional
+        : 0;
+      const dx  = (pos[i + 1] || 0) - (pos[i] || 0);
+      const pts = buildGapParticles(i, count, dx);
+      gapParticles.push(pts);
+      const rng = mkRng(i * 3141 + 59265);
+      particlePhases.push(pts.map(() => ({ phase: rng() * Math.PI * 2, freq: 0.5 + rng() * 0.9 })));
+    }
+
+    // Mark excess dots green (above default count) so color always matches signed delta
+    for (let i = 0; i < gapParticles.length; i++) {
+      const excess = gapParticles[i].length - (gapDefaultCounts[i] || 0);
+      if (excess > 0) {
+        gapParticles[i].slice(-excess).forEach(p => { p.isNew = true; });
+      }
+    }
+
+    buildFloorParticles(pos);
+  }
+
+  function buildFloorParticles(pos) {
+    const cPos = centered(pos);
+    floorParticles = new Array(Math.max(0, letterData.length - 1)).fill(null).map(() => []);
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) continue;
+      const deficit = Math.max(0, (gapDefaultCounts[i] || 0) - (gapParticles[i] || []).length);
+      if (deficit === 0) continue;
+      const gL = cPos[i] + a.inkRight, gR = cPos[i + 1] + b.inkLeft;
+      const spread = FONT_SIZE * floorSpread;
+      const sc0 = gapScatter(i, deficit);
+      const rng = mkRng(i * 5551 + 7777);
+      for (let k = 0; k < deficit; k++) {
+        const xn = rng() * 2 - 1;
+        const yn = rng();
+        floorParticles[i].push({
+          xOff: xn * spread, xOffNorm: xn,
+          yOff: yn * sc0,   yOffNorm: yn,
+          phase: rng() * Math.PI * 2,
+          freq:  0.5 + rng() * 0.9,
+          mode:  'floor'
+        });
+      }
+    }
+  }
+
+  function rebuildFloorForGap(i, pos) {
+    if (!floorParticles[i]) floorParticles[i] = [];
+    const a = letterData[i], b = letterData[i + 1];
+    if (!a || !b || a.isSpace || b.isSpace) return;
+    const cPos = centered(pos);
+    const gL = cPos[i] + a.inkRight, gR = cPos[i + 1] + b.inkLeft;
+    const spread = FONT_SIZE * floorSpread;
+    // count how many floor particles we need (target deficit at new algo positions)
+    const activeInGap = (gapParticles[i] || []).filter(p => !p.isGray).length;
+    const deficit = Math.max(0, (gapDefaultCounts[i] || 0) - activeInGap);
+    const current  = floorParticles[i].length;
+    const sc1 = gapScatter(i, deficit);
+    const rng = mkRng(i * 5551 + Math.round(performance.now()));
+    for (let k = current; k < deficit; k++) {
+      const xn = rng() * 2 - 1;
+      const yn = rng();
+      floorParticles[i].push({
+        xOff: xn * spread, xOffNorm: xn,
+        yOff: yn * sc1,   yOffNorm: yn,
+        phase: rng() * Math.PI * 2,
+        freq:  0.5 + rng() * 0.9,
+        mode:  'floor'
+      });
+    }
+    // trim if we somehow have too many
+    if (floorParticles[i].length > deficit) floorParticles[i].length = deficit;
+  }
+
+  // ── algo transition (add / remove dots, no full rebuild) ─────────
+  function computeNewParticleDistribution(positions) {
+    const areas = [];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) { areas.push(0); continue; }
+      const dx = (positions[i + 1] || 0) - (positions[i] || 0);
+      areas.push(Math.max(0, poolArea(a, b, dx)));
+    }
+    // Use fixed dotDensity (set at default layout) so delta = f(absolute area change).
+    // Never proportional here — that would cause false positives when a large pair shrinks.
+    return areas.map((area, i) => {
+      const count = area > 0 ? Math.max(8, Math.round(dotDensity * area)) : 0;
+      const dx = (positions[i + 1] || 0) - (positions[i] || 0);
+      return buildGapParticles(i, count, dx);
+    });
+  }
+
+  // Returns effective vertical scatter for a gap given its floor particle count
+  function gapScatter(gapIdx, count) {
+    return floorScatter; // build-time: always full scatter; rebuildFloorYOffsets normalizes for matchDensity
+  }
+
+  function rebuildFloorYOffsets() {
+    if (!matchDensity) {
+      floorParticles.forEach(fps => {
+        if (!fps) return;
+        fps.forEach(fp => { fp.yOff = (fp.yOffNorm || 0) * floorScatter; });
+      });
+      return;
+    }
+    // Proportional height: gap with most floor particles gets floorScatter, others scale down
+    const maxCount = floorParticles.reduce((m, fps) => Math.max(m, fps ? fps.length : 0), 1);
+    floorParticles.forEach((fps, i) => {
+      if (!fps || !fps.length) return;
+      const sc = floorScatter * fps.length / maxCount;
+      fps.forEach(fp => { fp.yOff = (fp.yOffNorm || 0) * sc; });
+    });
+  }
+
+  const GREEN_DELAY     = 1200; // ms: phase 2 position animation start
+  const GREEN_DOT_DELAY = 0;    // ms: green dots start immediately with pink (no phase gap)
+
+  function transitionAlgo(newAlgo) {
+    if (comparing || newAlgo === activeAlgo || !currentFont || !letterData.length) return;
+    // Block hover until both dot phases + position animation finish (~2600ms)
+    transitionBusy = true;
+    hoveredGapIdx = -1;
+    annotLayer.innerHTML = '';
+    annotCardParticles = [];
+    letterEls.forEach(el => { if (el) el.style.opacity = '1'; });
+    pendingTransTimers.push(setTimeout(() => { transitionBusy = false; }, 1400));
+    const oldPos = displayPositions.slice();
+    activeAlgo = newAlgo;
+    syncAlgo();
+    const newPos    = (algoPositions[newAlgo] || algoPositions.default).slice();
+    const newGapPts = computeNewParticleDistribution(newPos);
+    const nowMs     = performance.now();
+
+    // Pre-compute final floor counts so sinking dots land at proportional height immediately,
+    // avoiding the snap that rebuildFloorYOffsets would otherwise cause.
+    const finalFloorCounts = newGapPts.map((newPts, i) =>
+      Math.max(0, (gapDefaultCounts[i] || 0) - newPts.length)
+    );
+    const maxFC = Math.max(1, ...finalFloorCounts);
+
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const oldPts = gapParticles[i]   || [];
+      const oldPhs = particlePhases[i] || [];
+      const newPts = newGapPts[i]      || [];
+      const rng    = mkRng(i * 6781 + Math.round(nowMs));
+
+      if (newPts.length > oldPts.length) {
+        // Gap gains dots
+        const toAdd = newPts.slice(oldPts.length);
+        const stagger = 180 / Math.max(1, toAdd.length);
+        const willBePositive = newPts.length > (gapDefaultCounts[i] || 0);
+        const fps = floorParticles[i] || [];
+        const floorCount = Math.min(fps.length, toAdd.length);
+
+        // newPts is sorted highest-y first (bottom-up), so newPts[0..floorCount-1]
+        // are the bottommost positions in the full gap — exactly where floor particles belong.
+        // toAdd = newPts.slice(oldPts.length) skips those bottom slots, so we must go
+        // back to newPts directly for the floor targets.
+        for (let j = 0; j < floorCount; j++) {
+          const fp = fps[j], target = newPts[j]; // newPts[j] = bottommost j-th position
+          fp.bootFall     = false; // cancel any in-progress boot fall
+          fp.mode         = 'rising';
+          fp.riseStartMs  = nowMs + j * stagger;
+          fp.targetXFrac  = target.xFrac;
+          fp.targetY      = target.y;
+        }
+        // Claimed particles stay in floorParticles with mode:'rising' — they animate
+        // up, land in gapParticles, and remove themselves. Unclaimed ones remain on floor.
+        if (floorCount > 0) {
+          if (!gapLabelState[i]) gapLabelState[i] = {};
+          gapLabelState[i].riseStartMs = nowMs;
+          delete gapLabelState[i].sinkStartMs;
+        }
+
+        // Remaining new slots (topmost positions) — floating-down if positive delta, entering otherwise
+        // Green dots delayed GREEN_DELAY ms so pink sinking finishes first
+        const topEntries = toAdd.slice(floorCount);
+        topEntries.forEach((p, j) => {
+          if (willBePositive) {
+            p.mode    = 'floating-down';
+            p.floatMs = nowMs + GREEN_DOT_DELAY + (floorCount + j) * stagger;
+          } else {
+            p.mode    = 'entering';
+            p.enterMs = nowMs + (floorCount + j) * stagger;
+          }
+        });
+        // Animate green label in after pink has landed
+        if (willBePositive && topEntries.length > 0) {
+          if (!gapLabelState[i]) gapLabelState[i] = {};
+          gapLabelState[i].floatStartMs = nowMs + GREEN_DOT_DELAY + 900; // delay until first dots enter the gap
+          delete gapLabelState[i].sinkStartMs;
+          delete gapLabelState[i].riseStartMs;
+        }
+        gapParticles[i]   = [...oldPts, ...topEntries];
+        particlePhases[i] = [...oldPhs, ...topEntries.map(() => ({ phase: rng() * Math.PI * 2, freq: 0.5 + rng() * 0.9 }))];
+        // (claimed floor particles add themselves to gapParticles when they arrive)
+
+      } else if (newPts.length < oldPts.length) {
+        // Gap loses dots — prefer removing green (isNew) dots first, then gray
+        const excessCount    = oldPts.length - newPts.length;
+        const stagger        = 300 / Math.max(1, excessCount);
+        // Destination below default = gray removals become floor particles (pink)
+        const willBeNegative = newPts.length < (gapDefaultCounts[i] || 0);
+
+        // Build exit set: isNew dots first (float up), then bottommost gray dots (short sink path)
+        const greenIdxs = oldPts.map((p, idx) => p.isNew ? idx : -1).filter(idx => idx >= 0);
+        const grayByY   = oldPts.map((p, idx) => ({ idx, y: p.y }))
+          .filter(x => !oldPts[x.idx].isNew)
+          .sort((a, b) => b.y - a.y); // descending: bottommost first — shortest path to floor
+        const exitSet = new Set();
+        const greenToExit = Math.min(greenIdxs.length, excessCount);
+        for (let k = 0; k < greenToExit; k++) exitSet.add(greenIdxs[k]);
+        const grayNeeded = excessCount - greenToExit;
+        // Take the bottommost gray dots (already sorted descending)
+        for (let k = 0; k < Math.min(grayNeeded, grayByY.length); k++) exitSet.add(grayByY[k].idx);
+
+        const a = letterData[i], b = letterData[i + 1];
+        const cPos = centered(newPos);
+        const spread = FONT_SIZE * floorSpread;
+        let floatJ = 0, sinkJ = 0;
+        oldPts.forEach((p, idx) => {
+          if (!exitSet.has(idx)) return;
+          const ph = oldPhs[idx] || { phase: 0, freq: 1 };
+          if (p.isNew) {
+            // Green dot — float up and out of viewport top
+            p.mode    = 'floating-up';
+            p.floatMs = nowMs + floatJ++ * stagger;
+            delete p.isNew;
+          } else if (willBeNegative) {
+            // Gray dot removed from gap going below default — sink and become floor particle
+            p.mode    = 'sinking';
+            p.sinkMs  = nowMs + sinkJ++ * stagger;
+            p.isGray  = true;
+            const rng2 = mkRng(idx * 7777 + Math.round(nowMs));
+            const fxn = rng2() * 2 - 1, fyn = rng2();
+            const propSc = matchDensity ? floorScatter * finalFloorCounts[i] / maxFC : floorScatter;
+            p.floorXOff = fxn * spread; p.floorXNorm = fxn;
+            p.floorYOff = fyn * propSc; p.floorYNorm = fyn;
+            p.sinkPhase = ph.phase;
+            p.sinkFreq  = ph.freq;
+          } else {
+            // Gray dot removed but gap stays at/above default — fall out the bottom
+            p.mode   = 'exiting';
+            p.exitMs = nowMs + sinkJ++ * stagger;
+          }
+        });
+        // Floor particles created when sinking particles arrive (in drawSandLive cleanup)
+        if (willBeNegative && sinkJ > 0) {
+          if (!gapLabelState[i]) gapLabelState[i] = {};
+          gapLabelState[i].sinkStartMs = nowMs + 1100; // delay until pink dots land
+          delete gapLabelState[i].riseStartMs;
+        }
+      }
+      // exits and entries across different gaps all fire at nowMs — simultaneous
+    }
+
+    if (newAlgo === 'optical') {
+      // Two-phase animation:
+      // Phase 1 (immediate, 1200ms): move negative-delta gaps — letters move with pink dots
+      // Phase 2 (GREEN_DELAY ms, 1200ms): move positive-delta gaps — letters move with green dots
+      // Use dot-count delta (not pixel gap direction) to decide phase — proportional distribution
+      // means a gap can gain dots even when its pixel gap shrinks, so pixel direction is unreliable.
+      const midPos = [oldPos[0]];
+      for (let gi = 0; gi < letterData.length - 1; gi++) {
+        const oldGap  = oldPos[gi + 1] - oldPos[gi];
+        const newGap  = newPos[gi + 1] - newPos[gi];
+        // Phase 1 = compress (move to optical immediately); Phase 2 = expand (hold, then open with green).
+        // Now that density is fixed, delta sign = pixel direction, so newGap comparison is reliable.
+        midPos.push(midPos[gi] + (newGap < oldGap ? newGap : oldGap));
+      }
+      animatePositionsOnly(oldPos, midPos, 1200);
+      pendingTransTimers.push(setTimeout(() => animatePositionsOnly(midPos, newPos, 1200), GREEN_DELAY));
+      pendingTransTimers.push(setTimeout(() => rebuildFloorYOffsets(), 1400)); // normalize heights after pink dots land
+    } else {
+      animatePositionsOnly(oldPos, newPos, 1200);
+      pendingTransTimers.push(setTimeout(() => rebuildFloorYOffsets(), 1400));
+    }
+    updateStatus();
+  }
+
+  // ── fly-in animation ──────────────────────────────────
+  function easeOutBack(t) {
+    const c = 1.70158;
+    return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+  }
+
+  function letterFillPoints(lIdx, count) {
+    const d = letterData[lIdx];
+    if (!d || d.isSpace || !d.contours) return [];
+    const rng = mkRng(lIdx * 9871 + 54321);
+    const pts = [], h = d.inkBottom - d.inkTop;
+    for (let attempt = 0; pts.length < count && attempt < count * 10; attempt++) {
+      const y = d.inkTop + rng() * h;
+      const xs = [];
+      for (const c of d.contours) {
+        for (let i = 0; i < c.length - 1; i++) {
+          const p1 = c[i], p2 = c[i + 1];
+          if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y)) {
+            xs.push(p1.x + (y - p1.y) / (p2.y - p1.y) * (p2.x - p1.x));
+          }
+        }
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        if (xs[k + 1] > xs[k] + 1) {
+          pts.push({ x: xs[k] + rng() * (xs[k + 1] - xs[k]), y });
+          break;
+        }
+      }
+    }
+    return pts;
+  }
+
+  function buildFlyParticles() {
+    flyLetters = []; flyParticles = [];
+    const pos = centered(displayPositions);
+    for (let i = 0; i < letterData.length; i++) {
+      const d = letterData[i];
+      if (!d || d.isSpace) continue;
+      if (d.char < 'A' || d.char > 'Z') continue;
+      flyLetters.push(i);
+      const cx = pos[i] + (d.inkLeft + d.inkRight) / 2;
+      const cy = (d.inkTop + d.inkBottom) / 2;
+      const rng = mkRng(i * 4567 + 99);
+      const targets = letterFillPoints(i, dotCount);
+      flyParticles.push(targets.map(t => {
+        const angle = rng() * Math.PI * 2;
+        const dist  = 140 + rng() * 220;
+        return {
+          targetX: pos[i] + t.x, targetY: t.y,
+          startX:  cx + Math.cos(angle) * dist,
+          startY:  cy + Math.sin(angle) * dist,
+          phase:   rng()
+        };
+      }));
+    }
+  }
+
+  function drawFlyLayer(nowMs) {
+    if (!flyActive || !flyLetters.length) return;
+    const sc = pxPerSvg(), pr = Math.max(0.5, dotSize * sc);
+    const elapsed = nowMs - flyStartMs;
+
+    ctx.save();
+    ctx.fillStyle = dotColor;
+
+    let allDone = true;
+    for (let fi = 0; fi < flyLetters.length; fi++) {
+      const li = flyLetters[fi];
+      const letterT = (elapsed - fi * FLY_DUR) / FLY_DUR;
+      const totalT  = letterT + FLY_FADE / FLY_DUR; // includes fade-back window
+
+      if (letterT < 0) { allDone = false; continue; }
+
+      // SVG letter opacity: hide while filling, fade back in after
+      if (letterEls[li]) {
+        if (letterT < 1) {
+          letterEls[li].setAttribute('opacity', '0');
+          allDone = false;
+        } else {
+          const fade = Math.min(1, (elapsed - (fi * FLY_DUR + FLY_DUR)) / FLY_FADE);
+          letterEls[li].setAttribute('opacity', fade.toFixed(3));
+          if (fade < 1) allDone = false;
+        }
+      }
+
+      if (letterT >= 1) continue; // just fading SVG back in, no more dots
+
+      const pts = flyParticles[fi] || [];
+      for (let j = 0; j < pts.length; j++) {
+        const p = pts[j];
+        const tStart = p.phase * 0.45;
+        const arrT   = Math.min(1, Math.max(0, (letterT - tStart) / (1 - tStart + 0.01)));
+        if (arrT <= 0) continue;
+        const eased  = easeOutBack(arrT);
+        const [cx, cy] = toCanvasPt(
+          p.startX + (p.targetX - p.startX) * eased,
+          p.startY + (p.targetY - p.startY) * eased
+        );
+        ctx.globalAlpha = Math.min(1, arrT * 4) * dotOpacity;
+        ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    ctx.restore();
+    if (allDone) {
+      flyActive = false;
+      flyLetters.forEach(li => { if (letterEls[li]) letterEls[li].setAttribute('opacity', '1'); });
+    }
+  }
+
+  function startFlyAnim() {
+    if (!currentFont || !letterData.length) return;
+    flyLetters.forEach(li => { if (letterEls[li]) letterEls[li].setAttribute('opacity', '1'); });
+    buildFlyParticles();
+    if (!flyLetters.length) return;
+    flyStartMs = performance.now();
+    flyActive  = true;
+    startLoop();
+  }
+
+  // ── sequential gap animation ──────────────────────────
+  function startSeqAnim() {
+    if (!currentFont || !letterData.length) return;
+    seqFloorPos = (algoPositions.floor || algoPositions.default || []).slice();
+    seqOptPos   = (algoPositions[activeAlgo] || algoPositions.default || []).slice();
+    seqDeltas   = [];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const floorDx = seqFloorPos[i + 1] - seqFloorPos[i];
+      const optDx   = seqOptPos[i + 1]   - seqOptPos[i];
+      seqDeltas.push(Math.max(0, optDx - floorDx));
+    }
+    flyActive     = false;
+    animStartTime = null;
+    displayPositions = seqFloorPos.slice();
+    updateRender(displayPositions);
+    sandT      = 0;
+    seqGapFill = new Array(Math.max(0, letterData.length - 1)).fill(0);
+    seqActive  = true;
+    seqStartMs = performance.now();
+    startLoop();
+  }
+
+  function startBootSeqAnim() {
+    if (!currentFont || !letterData.length) return;
+
+    // Build particles for default algo — no floor particles, all deltas zero
+    activeAlgo = 'default';
+    syncAlgo();
+    buildAllGapParticles();
+
+    const defPos   = (algoPositions.default || []).slice();
+    // Start 20% tighter than default — letters expand to default as gray dots fall in
+    const tightPos = defPos.map((p, i) => defPos[0] + (p - defPos[0]) * 0.8);
+
+    seqFloorPos = tightPos;
+    seqOptPos   = defPos;
+    seqDeltas   = [];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const tightDx = tightPos[i + 1] - tightPos[i];
+      const defDx   = defPos[i + 1]   - defPos[i];
+      seqDeltas.push(Math.max(0, defDx - tightDx));
+    }
+
+    flyActive        = false;
+    animStartTime    = null;
+    displayPositions = tightPos.slice();
+    updateRender(displayPositions);
+    sandT          = 0;
+    seqGapFill     = new Array(Math.max(0, letterData.length - 1)).fill(0);
+    seqActive      = true;
+    seqStartMs     = performance.now();
+    seqGapDurMs    = 2800;
+    seqGapStepMs   = 180;
+    seqAutoOptical = true;  // after default fill, auto-trigger optical transition
+
+    startLoop();
+  }
+
+  function runSeqAnim(nowMs) {
+    const elapsed  = nowMs - seqStartMs;
+    const durMs    = seqGapDurMs  / seqSpeed;
+    const stepMs   = seqGapStepMs / seqSpeed;
+    const gapCount = letterData.length - 1;
+    const fill = [];
+    for (let i = 0; i < gapCount; i++) {
+      fill[i] = Math.min(1, Math.max(0, (elapsed - i * stepMs) / durMs));
+    }
+    seqGapFill = fill;
+
+    // Cumulative letter shifts as each gap expands
+    const newPos = seqFloorPos.slice();
+    let cumShift = 0;
+    for (let j = 1; j < newPos.length; j++) {
+      cumShift += seqDeltas[j - 1] * easeInOut(fill[j - 1] || 0);
+      newPos[j] = seqFloorPos[j] + cumShift;
+    }
+    displayPositions = newPos;
+    updateRender(displayPositions);
+
+    if (fill.every(t => t >= 1)) {
+      seqActive    = false;
+      seqGapFill   = null;
+      seqGapDurMs  = SEQ_GAP_DUR;
+      seqGapStepMs = SEQ_GAP_STEP;
+      displayPositions = seqOptPos.slice();
+      updateRender(displayPositions);
+      sandT = 1;
+      if (seqAutoOptical) {
+        seqAutoOptical = false;
+        setTimeout(() => { transitionAlgo('optical'); }, 700);
+      }
+    }
+  }
+
+  // ── draw sand (live — every frame) ────────────────────
+  function drawSandLive(nowSec, nowMs) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!showSand || !letterData.length) return;
+
+    const sc     = pxPerSvg();
+    const pos    = centered(displayPositions);
+    const n      = letterData.length - 1;
+    const pr     = Math.max(0.5, dotSize * sc);
+    const prDust = Math.max(0.6, 0.38 * sc);
+
+    // SVG Y of the canvas top edge (negative = above SVG origin)
+    const { top: stTop, height: stH } = stage.getBoundingClientRect();
+    const { top: cvTop }              = canvas.getBoundingClientRect();
+    const svgYCanvasTop = (cvTop - stTop) * VIEWBOX_H / stH;
+
+    // Shake spike when tracking changes, decays over 0.7s
+    const trackDt  = nowSec - lastTrackTime;
+    const shakeAmp = trackDt < 0.9 ? Math.pow(1 - trackDt / 0.9, 2) * 6.0 : 0;
+
+    ctx.save();
+    ctx.fillStyle = dotColor;
+
+    for (let i = 0; i < n; i++) {
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) continue;
+
+      const ax = pos[i], bx = pos[i + 1];
+      const yMin = Math.ceil(Math.max(a.inkTop, b.inkTop));
+      const yMax = Math.floor(Math.min(a.inkBottom, b.inkBottom));
+      if (yMax <= yMin) continue;
+
+      const staggerStart = seqGapFill !== null ? 0 : (i / Math.max(1, n)) * 0.28;
+      let gapT;
+      if (seqGapFill !== null) {
+        gapT = seqGapFill[i] || 0;
+      } else {
+        gapT = Math.min(1, Math.max(0, (sandT - staggerStart) / 0.72));
+      }
+      if (gapT <= 0) continue;
+
+      // Dim this gap if a different gap is hovered
+      const gapDim = hoveredGapIdx >= 0 && i !== hoveredGapIdx
+        ? 1 - hoverOpacity * 0.9 : 1;
+
+      const pts    = gapParticles[i]   || [];
+      const phases = particlePhases[i] || [];
+      const np     = pts.length;
+      if (!np) continue;
+
+      // ── sand grains ──
+      for (let j = 0; j < np; j++) {
+        const tRelease = (j / Math.max(1, np - 1)) * 0.65;
+        const fallT    = Math.min(1, Math.max(0, (gapT - tRelease) / 0.35));
+
+        const p  = pts[j];
+        const ph = phases[j] || { phase: 0, freq: 1 };
+
+        const aR = inkRightAt(a, p.y), bL = inkLeftAt(b, p.y);
+        if (aR == null || bL == null) continue;
+        const gL = ax + aR, gR = bx + bL;
+        if (gR <= gL) continue;
+
+        let svgX = gL + p.xFrac * (gR - gL);
+        let svgY, alpha, isEntering = false, particleColor = null;
+
+        if (p.mode === 'exiting') {
+          const exitElapsed = nowMs - p.exitMs;
+          if (exitElapsed < 0) {
+            // Not yet exiting — draw settled
+            const ts    = nowSec * ph.freq * dotSpeed;
+            const micro = dotAmp + shakeAmp;
+            svgX += Math.sin(ts + ph.phase) * micro * 0.75;
+            svgY  = p.y + Math.cos(ts * 1.25 + ph.phase * 1.7) * micro * 0.5;
+            alpha = dotOpacity;
+          } else {
+            const elS  = exitElapsed / 1000;
+            const spd  = 220 * (1 + fallGravity * 0.5);
+            svgY  = p.y + elS * spd + 180 * elS * elS;
+            alpha = Math.max(0, 1 - elS * 0.9) * dotOpacity;
+            const [, cy] = toCanvasPt(svgX, svgY);
+            if (alpha <= 0 || cy > canvas.height + 20) { p._remove = true; continue; }
+          }
+        } else if (p.mode === 'entering') {
+          const enterElapsed = nowMs - p.enterMs;
+          if (enterElapsed < 0) continue;
+          const enterT  = Math.min(1, enterElapsed / 1000);
+          const gravT   = Math.pow(enterT, 1.5 + fallGravity);
+          const yTop    = svgYCanvasTop - 20 - ph.phase * 60;
+          const targetX = svgX;
+          const centerX = (gL + gR) / 2;
+          svgX  = centerX + (targetX - centerX) * Math.pow(enterT, 1 / (fallMagnet * 2));
+          svgX += Math.sin(ph.phase * Math.PI * 2) * fallDrift * 0.25 * Math.pow(1 - enterT, 2);
+          svgX += Math.sin(enterT * 15 + ph.phase * 8) * fallWobble * 0.12 * enterT * (1 - enterT);
+          svgY  = yTop + (p.y - yTop) * gravT;
+          alpha = Math.min(1, enterT * 3) * dotOpacity;
+          isEntering = true;
+          if (enterT >= 1) { delete p.mode; delete p.enterMs; }
+        } else if (p.mode === 'floating-up') {
+          // Green dot floats up and out of viewport top
+          const elapsed = nowMs - p.floatMs;
+          if (elapsed < 0) {
+            svgY = p.y; alpha = dotOpacity; particleColor = annotPosColor;
+          } else {
+            const t    = elapsed / 1100;
+            const ease = easeInOut(Math.min(1, t));
+            svgY  = p.y - ease * (p.y - svgYCanvasTop + 80);
+            alpha = (t > 0.65 ? Math.max(0, 1 - (t - 0.65) / 0.35) : 1) * dotOpacity;
+            particleColor = annotPosColor;
+            if (t >= 1 || alpha <= 0) { p._remove = true; continue; }
+          }
+        } else if (p.mode === 'floating-down') {
+          // Green dot falls from above the viewport to its final position.
+          // svgX is recomputed from the CURRENT svgY so the dot always follows the actual
+          // gap boundary at that height — prevents it from mapping into the letter ink
+          // while crossing the glyph during the long descent.
+          const elapsed = nowMs - p.floatMs;
+          if (elapsed < 0) continue;
+          const t    = Math.min(1, elapsed / 1000);
+          const ease = easeInOut(t);
+          const yTop = svgYCanvasTop - 40 - ph.phase * 80;
+          svgY = yTop + (p.y - yTop) * ease;
+          const yGapTop = Math.max(a.inkTop, b.inkTop);
+          if (svgY >= yGapTop) {
+            // Inside the gap — recompute x from current y's ink boundaries
+            const curAR = inkRightAt(a, svgY), curBL = inkLeftAt(b, svgY);
+            if (curAR != null && curBL != null) {
+              const curGL = ax + curAR, curGR = bx + curBL;
+              if (curGR > curGL) svgX = curGL + p.xFrac * (curGR - curGL);
+            }
+          }
+          // Above yGapTop: svgX stays as computed from p.y (dot is above all letter ink)
+          alpha = Math.min(1, t * 2.5) * dotOpacity;
+          particleColor = annotPosColor;
+          if (t >= 1) { delete p.mode; delete p.floatMs; p.isNew = true; }
+        } else if (p.mode === 'sinking') {
+          // Gray dot sinks to floor, lerping gray→pink, then becomes a floor particle
+          const elapsed = nowMs - p.sinkMs;
+          if (elapsed < 0) {
+            svgY = p.y; alpha = dotOpacity;
+          } else {
+            const t    = Math.min(1, elapsed / 1000);
+            const ease = easeInOut(t);
+            const floorX = (ax + a.inkRight + bx + b.inkLeft) / 2 + (p.floorXOff || 0);
+            svgX = svgX + ease * (floorX - svgX);
+            svgY = p.y + ease * (FLOOR_SVG_Y + (p.floorYOff || 0) - p.y);
+            const _nr = hexRgb(annotNegColor);
+            const cr = Math.round(102 + ease * (_nr.r - 102));
+            const cg = Math.round(102 + ease * (_nr.g - 102));
+            const cb = Math.round(102 + ease * (_nr.b - 102));
+            particleColor = `rgb(${cr},${cg},${cb})`;
+            alpha = dotOpacity;
+            if (t >= 1) { p._sinkDone = true; }
+          }
+        } else if (fallT <= 0) {
+          break; // initial fill: sorted bottom-up, nothing after this lands yet
+        } else if (fallT < 1) {
+          const gravT  = Math.pow(fallT, 1.5 + fallGravity);
+          const yStart = svgYCanvasTop - 20 - ph.phase * 60;
+          svgY  = yStart + (p.y - yStart) * gravT;
+          const targetX = svgX, centerX = (gL + gR) / 2;
+          svgX  = centerX + (targetX - centerX) * Math.pow(fallT, 1 / (fallMagnet * 2));
+          svgX += Math.sin(ph.phase * Math.PI * 2) * fallDrift * 0.25 * Math.pow(1 - fallT, 2);
+          svgX += Math.sin(fallT * 15 + ph.phase * 8) * fallWobble * 0.12 * fallT * (1 - fallT);
+          alpha = Math.min(1, fallT * 3) * dotOpacity;
+        } else {
+          const settleAbsTime = fillAnimStartMs > 0
+            ? fillAnimStartMs / 1000 + (staggerStart + (tRelease + 0.35) * 0.72) * animDuration / 1000
+            : nowSec - 99;
+          const dt     = nowSec - settleAbsTime;
+          const bounce = dt > 0 ? Math.sin(dt * 24) * Math.exp(-dt * 9) * 2.2 : 0;
+          const micro  = dotAmp + shakeAmp;
+          const ts = nowSec * ph.freq * dotSpeed;
+          svgX += Math.sin(ts + ph.phase) * micro * 0.75;
+          svgY  = p.y - bounce + Math.cos(ts * 1.25 + ph.phase * 1.7) * micro * 0.5;
+          alpha = dotOpacity;
+        }
+
+        const [cx, cy] = toCanvasPt(svgX, svgY);
+        ctx.globalAlpha = alpha * gapDim;
+        let dotR = pr;
+        if (particleColor !== null) {
+          ctx.fillStyle = particleColor;
+          dotR = pr * 2; // colored (green/pink transition) dots are 2× size
+        } else {
+          const gapDelta = (gapParticles[i] || []).filter(q => !q.isGray).length - (gapDefaultCounts[i] || 0);
+          const isGreen = p.isNew && gapDelta > 0;
+          ctx.fillStyle = isGreen ? annotPosColor : dotColor;
+          if (isGreen) dotR = pr * 2;
+        }
+        ctx.beginPath();
+        ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = dotColor; // restore after gap loop
+
+      // ── dust mist ──
+      if (gapT >= 0.7) {
+        const dustScale = Math.min(1, (gapT - 0.7) / 0.3);
+        for (let d = 0; d < 5; d++) {
+          const phase = ((nowSec * 0.36 + d / 5 + i * 0.29) % 1 + 1) % 1;
+          const dustY = yMin + (yMax - yMin) * 0.06 - phase * (yMax - yMin) * 0.26;
+          const clY   = Math.min(yMax - 1, Math.max(yMin, dustY));
+          const aRd = inkRightAt(a, clY), bLd = inkLeftAt(b, clY);
+          if (aRd == null || bLd == null) continue;
+          const gLd = ax + aRd, gRd = bx + bLd;
+          if (gRd <= gLd) continue;
+          const [cx2, cy2] = toCanvasPt(gLd + ((d * 0.168 + i * 0.618) % 1) * (gRd - gLd), dustY);
+          ctx.globalAlpha = Math.sin(phase * Math.PI) * 0.18 * dustScale * gapDim;
+          ctx.beginPath();
+          ctx.arc(cx2, cy2, prDust, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // ── clean up exited particles + transfer sunk particles to floorParticles ──
+    for (let i = 0; i < n; i++) {
+      const pts = gapParticles[i];
+      if (!pts) continue;
+      const hasRemove = pts.some(p => p._remove);
+      const hasSunk   = pts.some(p => p._sinkDone);
+      if (!hasRemove && !hasSunk) continue;
+      const keptPts = [], keptPhs = [];
+      for (let j = 0; j < pts.length; j++) {
+        const p = pts[j];
+        if (p._remove) continue;
+        if (p._sinkDone) {
+          if (!floorParticles[i]) floorParticles[i] = [];
+          floorParticles[i].push({
+            xOff: p.floorXOff || 0, xOffNorm: p.floorXNorm || 0,
+            yOff: p.floorYOff || 0, yOffNorm: p.floorYNorm || 0,
+            phase: p.sinkPhase || 0, freq: p.sinkFreq || 1, mode: 'floor'
+          });
+          continue;
+        }
+        keptPts.push(p);
+        keptPhs.push((particlePhases[i] || [])[j]);
+      }
+      gapParticles[i] = keptPts;
+      particlePhases[i] = keptPhs;
+    }
+
+    // ── particle count labels per gap ──
+    labelHitAreas = [];
+    const labelPx = Math.round(11 * devicePixelRatio);
+    ctx.save();
+    ctx.font = `400 ${labelPx}px "Space Mono", monospace`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < n; i++) {
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b || a.isSpace || b.isSpace) continue;
+      const count = (gapParticles[i] || []).length;
+      if (!count) continue;
+
+      // Only increment as dots physically land (first lands at gapT=0.35, last at gapT=1.0)
+      const pillStagger  = seqGapFill !== null ? 0 : (i / Math.max(1, n)) * 0.28;
+      const pillGapT     = seqGapFill !== null
+        ? (seqGapFill[i] || 0)
+        : Math.min(1, Math.max(0, (sandT - pillStagger) / 0.72));
+      const landedFrac   = Math.max(0, Math.min(1, (pillGapT - 0.35) / 0.65));
+      const displayCount = pillGapT >= 1 ? count : Math.round(count * landedFrac);
+      if (!displayCount) continue;
+
+      const ax = pos[i], bx = pos[i + 1];
+      const gapCx = (ax + a.inkRight + bx + b.inkLeft) / 2;
+
+      const labelDim = hoveredGapIdx >= 0 && i !== hoveredGapIdx
+        ? 1 - hoverOpacity * 0.9 : 1;
+
+      // signed delta vs default count — exclude in-flight dots so labels animate with the dots
+      const baseCount     = gapDefaultCounts[i] || 0;
+      const settled       = (gapParticles[i] || []).filter(p =>
+        !p.isGray &&
+        p.mode !== 'floating-down' &&
+        p.mode !== 'floating-up' &&
+        p.mode !== 'entering'
+      ).length;
+      // Sinking: count dots that haven't yet started sinking (label ticks down as each sinkMs fires)
+      const notYetSinking  = (gapParticles[i] || []).filter(p => p.mode === 'sinking' && nowMs < p.sinkMs).length;
+      // Rising: count floor particles that have started rising (label ticks up as each riseStartMs fires)
+      const risingStarted  = (floorParticles[i] || []).filter(p => p.mode === 'rising' && nowMs >= p.riseStartMs).length;
+      // Floating-down: green dots still descending — count all of them so label shows +N immediately as it animates in
+      const floatingDown   = (gapParticles[i] || []).filter(p => p.mode === 'floating-down').length;
+      const activeCount    = settled + notYetSinking + risingStarted + floatingDown;
+      const delta         = activeCount - baseCount;
+      const deltaFull   = pillGapT >= 1 ? delta : Math.round(delta * landedFrac);
+      const deltaStr    = deltaFull > 0 ? `+${deltaFull}` : String(deltaFull);
+      const deltaColor  = delta > 0 ? annotPosColor : delta < 0 ? annotNegColor : labelColor;
+
+      // positive labels sit above the word; negative sit below the floor dots
+      // animated Y and opacity during transitions
+      const LABEL_ANIM_DUR = 800;
+      const labelState = gapLabelState[i] || {};
+      const floatPending = labelState.floatStartMs != null && nowMs < labelState.floatStartMs;
+      const hasAnim = labelState.sinkStartMs != null || labelState.riseStartMs != null ||
+                      (labelState.floatStartMs != null && !floatPending);
+
+      // skip zero labels when no visible animation is in progress
+      if (deltaFull === 0 && !hasAnim) continue;
+
+      const yAbove = Math.max(a.inkTop, b.inkTop) - 14;
+      const yFloor  = FLOOR_SVG_Y - 16; // label sits above cluster top
+      let labelSvgY   = delta < 0 ? yFloor : yAbove;
+      let labelOpacity = 1.0;
+
+      if (labelState.sinkStartMs != null) {
+        const elapsed = nowMs - labelState.sinkStartMs;
+        if (elapsed < 0) {
+          labelOpacity = 0;
+        } else {
+          const t = Math.min(1, elapsed / 400);
+          labelOpacity = easeInOut(t);
+          labelSvgY    = yFloor;
+          if (t >= 1) { delete labelState.sinkStartMs; gapLabelState[i] = labelState; }
+        }
+      } else if (labelState.riseStartMs != null) {
+        const t    = Math.min(1, (nowMs - labelState.riseStartMs) / LABEL_ANIM_DUR);
+        const ease = easeInOut(t);
+        labelSvgY    = yFloor + ease * (yAbove - yFloor);
+        labelOpacity = 1 - ease;
+        if (t >= 1) { delete labelState.riseStartMs; gapLabelState[i] = labelState; }
+      } else if (labelState.floatStartMs != null) {
+        const elapsed = nowMs - labelState.floatStartMs;
+        if (elapsed < 0) {
+          labelOpacity = 0;
+        } else {
+          const t = Math.min(1, elapsed / 400);
+          labelOpacity = easeInOut(t);
+          labelSvgY    = yAbove;
+          if (t >= 1) { delete labelState.floatStartMs; gapLabelState[i] = labelState; }
+        }
+      }
+
+      const [lx, ly] = toCanvasPt(gapCx, labelSvgY);
+      const coloredLabelPx = Math.round(15 * devicePixelRatio);
+      ctx.font = `600 ${coloredLabelPx}px "Space Mono", monospace`;
+      const tw = ctx.measureText(deltaStr).width;
+
+      // ── connector line: gap edge → label/floor ──────────────────────────
+      // Gradient: transparent at the gap (word interior) → 10% connectorColor at the external end.
+      if (connectorWeight > 0) {
+        const tcM = connectorColor.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        const [tr, tg, tb] = tcM ? [parseInt(tcM[1],16), parseInt(tcM[2],16), parseInt(tcM[3],16)] : [194,251,255];
+        const maxA = connectorOpacity * labelOpacity * labelDim;
+        const transparent = `rgba(${tr},${tg},${tb},0)`;
+        const tinted      = `rgba(${tr},${tg},${tb},${maxA.toFixed(3)})`;
+
+        ctx.save();
+        ctx.lineWidth = connectorWeight * devicePixelRatio;
+        ctx.globalAlpha = 1;
+
+        if (delta < 0) {
+          // Negative: gap bottom → just above the label (yFloor - 8 so the line doesn't overlap the number)
+          const yGapBot = Math.min(a.inkBottom, b.inkBottom);
+          const [lxL, lyGap]   = toCanvasPt(gapCx, yGapBot);
+          const [,    lyLabel] = toCanvasPt(gapCx, yFloor - 20);
+          const grad = ctx.createLinearGradient(0, lyGap, 0, lyLabel);
+          grad.addColorStop(0, transparent);
+          grad.addColorStop(1, tinted);
+          ctx.strokeStyle = grad;
+          ctx.beginPath(); ctx.moveTo(lxL, lyGap); ctx.lineTo(lxL, lyLabel); ctx.stroke();
+        } else if (delta > 0) {
+          // Positive: gap top → label
+          const yGapTop = Math.max(a.inkTop, b.inkTop);
+          const [lxL, lyGap]   = toCanvasPt(gapCx, yGapTop);
+          const [,    lyLabel] = toCanvasPt(gapCx, labelSvgY);
+          const grad = ctx.createLinearGradient(0, lyGap, 0, lyLabel);
+          grad.addColorStop(0, transparent);
+          grad.addColorStop(1, tinted);
+          ctx.strokeStyle = grad;
+          ctx.beginPath(); ctx.moveTo(lxL, lyGap); ctx.lineTo(lxL, lyLabel); ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      ctx.globalAlpha = labelOpacity * labelDim;
+      ctx.fillStyle   = deltaColor;
+      ctx.fillText(deltaStr, lx, ly);
+      ctx.font = `400 ${labelPx}px "Space Mono", monospace`; // restore
+
+      labelHitAreas.push({ gapIdx: i, x: lx, y: ly, r: (tw / 2 + 10 * devicePixelRatio) });
+    }
+    ctx.restore();
+  }
+
+  // ── floor particles (negative-delta displaced dots) ───
+  function drawFloorParticles(nowSec, nowMs) {
+    if (!floorParticles.length) return;
+    const sc  = pxPerSvg();
+    const pr  = Math.max(0.5, dotSize * sc);
+    const pos = centered(displayPositions);
+
+    const { top: stTop, height: stH } = stage.getBoundingClientRect();
+    const { top: cvTop } = canvas.getBoundingClientRect();
+    const svgYCanvasTop = (cvTop - stTop) * VIEWBOX_H / stH;
+
+    ctx.save();
+
+    for (let i = 0; i < floorParticles.length; i++) {
+      const fps = floorParticles[i];
+      if (!fps || !fps.length) continue;
+      const a = letterData[i], b = letterData[i + 1];
+      if (!a || !b) continue;
+      const gapCx = (pos[i] + a.inkRight + pos[i + 1] + b.inkLeft) / 2;
+      const floorDim = hoveredGapIdx >= 0 && i !== hoveredGapIdx
+        ? 1 - hoverOpacity * 0.9 : 1;
+
+      const toRemove = [];
+      for (let k = 0; k < fps.length; k++) {
+        const fp = fps[k];
+        let svgX, svgY, alpha = dotOpacity;
+
+        if (fp.bootFall) {
+          // Fall from top, pass through the gap, land on the floor — start immediately at boot
+          const durMs  = seqGapDurMs  / seqSpeed;
+          const gapStartMs = seqStartMs; // no stagger: pink falls before the gray wave begins
+          const elapsed = nowMs - gapStartMs;
+          if (elapsed < 0) continue;
+          const t     = Math.min(1, elapsed / durMs);
+          const gravT = Math.pow(t, 1.5 + fallGravity);
+          const yStart = svgYCanvasTop - 20 - fp.phase * 50;
+          svgX  = gapCx + fp.xOff * gravT;
+          svgX += Math.sin(fp.phase * Math.PI * 2) * fallDrift * 0.3 * Math.pow(1 - t, 2);
+          svgY  = yStart + (FLOOR_SVG_Y + fp.yOff - yStart) * gravT;
+          alpha = Math.min(1, t * 3) * dotOpacity;
+          ctx.fillStyle = annotNegColor;
+          if (t >= 1) fp.bootFall = false;
+
+        } else if (fp.mode === 'rising') {
+          const elapsed = nowMs - fp.riseStartMs;
+          if (elapsed < 0) {
+            // Not yet — sit at floor
+            const ts = nowSec * fp.freq * dotSpeed;
+            svgX = gapCx + fp.xOff + Math.sin(ts + fp.phase) * dotAmp * 0.3;
+            svgY = FLOOR_SVG_Y + fp.yOff;
+          } else {
+            const t    = Math.min(1, elapsed / 900);
+            const ease = easeInOut(t);
+            // Compute true target x from ink profile at target y
+            const aR = inkRightAt(a, fp.targetY), bL = inkLeftAt(b, fp.targetY);
+            const tgL = pos[i] + (aR !== null ? aR : a.inkRight);
+            const tgR = pos[i + 1] + (bL !== null ? bL : b.inkLeft);
+            const targetX = tgL + fp.targetXFrac * (tgR - tgL);
+            const startX  = gapCx + fp.xOff;
+            svgX = startX + (targetX - startX) * ease;
+            svgY = FLOOR_SVG_Y + fp.yOff + (fp.targetY - FLOOR_SVG_Y - fp.yOff) * ease;
+            // Color lerp: neg color → gray (#666666 = 102,102,102)
+            const _nr2 = hexRgb(annotNegColor);
+            const cr = Math.round(_nr2.r - ease * (_nr2.r - 102));
+            const cg = Math.round(_nr2.g + ease * (102 - _nr2.g));
+            const cb = Math.round(_nr2.b + ease * (102 - _nr2.b));
+            ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+            alpha = dotOpacity;
+            if (t >= 1) {
+              // Land in the gap — add as a proper gap particle
+              if (!gapParticles[i]) gapParticles[i] = [];
+              gapParticles[i].push({ xFrac: fp.targetXFrac, y: fp.targetY });
+              if (!particlePhases[i]) particlePhases[i] = [];
+              particlePhases[i].push({ phase: fp.phase, freq: fp.freq });
+              toRemove.push(k); continue;
+            }
+          }
+        } else {
+          const ts = nowSec * fp.freq * dotSpeed;
+          svgX = gapCx + fp.xOff + Math.sin(ts + fp.phase) * dotAmp * 0.3;
+          svgY = FLOOR_SVG_Y + fp.yOff + Math.cos(ts * 1.25 + fp.phase) * dotAmp * 0.15;
+          ctx.fillStyle = annotNegColor;
+        }
+
+        const [cx, cy] = toCanvasPt(svgX, svgY);
+        ctx.globalAlpha = alpha * floorDim;
+        ctx.beginPath();
+        ctx.arc(cx, cy, pr * 2, 0, Math.PI * 2); // floor (pink) dots are 2× size
+        ctx.fill();
+      }
+
+      for (let k = toRemove.length - 1; k >= 0; k--) fps.splice(toRemove[k], 1);
+    }
+
+    ctx.restore();
+  }
+
+  // ── annotation card falling dots ──────────────────────
+  function drawAnnotCardParticles(nowSec, nowMs) {
+    annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
+    if (!annotCardParticles.length) return;
+    const sc = pxPerSvg();
+    const pr = Math.max(2, 1.8 * sc);   // slightly smaller than before
+
+    for (const card of annotCardParticles) {
+      // Clip everything to the card's rounded rect so no dot escapes
+      const [cx0, cy0] = toCanvasPt(card.clip.x, card.clip.y);
+      const [cx1, cy1] = toCanvasPt(card.clip.x + card.clip.w, card.clip.y + card.clip.h);
+      const clipW = cx1 - cx0, clipH = cy1 - cy0;
+      const clipR = card.clip.r * sc;
+
+      annotCtx.save();
+      annotCtx.beginPath();
+      if (annotCtx.roundRect) {
+        annotCtx.roundRect(cx0, cy0, clipW, clipH, clipR);
+      } else {
+        annotCtx.moveTo(cx0 + clipR, cy0);
+        annotCtx.lineTo(cx0 + clipW - clipR, cy0);
+        annotCtx.arcTo(cx0 + clipW, cy0, cx0 + clipW, cy0 + clipR, clipR);
+        annotCtx.lineTo(cx0 + clipW, cy0 + clipH - clipR);
+        annotCtx.arcTo(cx0 + clipW, cy0 + clipH, cx0 + clipW - clipR, cy0 + clipH, clipR);
+        annotCtx.lineTo(cx0 + clipR, cy0 + clipH);
+        annotCtx.arcTo(cx0, cy0 + clipH, cx0, cy0 + clipH - clipR, clipR);
+        annotCtx.lineTo(cx0, cy0 + clipR);
+        annotCtx.arcTo(cx0, cy0, cx0 + clipR, cy0, clipR);
+        annotCtx.closePath();
+      }
+      annotCtx.clip();
+
+      for (const p of card.dots) {
+        const elapsed = nowMs - p.startMs;
+        if (elapsed < 0) continue;
+        const fallDur = 420;
+        const t = Math.min(1, elapsed / fallDur);
+        const gravT = t * t;  // real gravity — slow at top, fast at bottom
+        // After landing: gentle floating drift like the main gap particles
+        const floatSec  = Math.max(0, elapsed - fallDur) / 1000;
+        const floatEase = Math.min(1, floatSec / 0.6);
+        const floatY = Math.sin(floatSec * 1.4 + p.phase * Math.PI * 2) * 1.4 * floatEase;
+        const floatX = Math.sin(floatSec * 0.85 + p.phase * Math.PI * 3.1) * 0.8 * floatEase;
+        const svgX = p.svgX + Math.sin(p.phase * 5) * 0.8 * Math.pow(1 - t, 2) + floatX;
+        const svgY = card.ceiling + (p.svgY - card.ceiling) * gravT + floatY;
+        const alpha = Math.min(1, t * 5);
+        const [dotCx, dotCy] = toCanvasPt(svgX, svgY);
+        annotCtx.fillStyle   = p.color;
+        annotCtx.globalAlpha = alpha;
+        annotCtx.beginPath();
+        annotCtx.arc(dotCx, dotCy, pr, 0, Math.PI * 2);
+        annotCtx.fill();
+      }
+      annotCtx.restore();
+    }
+  }
+
+  // ── animation ─────────────────────────────────────────
+  function easeInOut(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  function startLoop() {
+    if (loopRaf) return;
+    function tick(now) {
+      // Smooth hover-dim fade
+      const hoTarget = hoveredGapIdx >= 0 ? 1 : 0;
+      hoverOpacity += (hoTarget - hoverOpacity) * 0.12;
+
+      if (seqActive) {
+        runSeqAnim(now);
+      } else if (animStartTime !== null) {
+        const t = Math.min(1, (now - animStartTime) / animDuration);
+        displayPositions = animFrom.map((p, k) => p + (animTarget[k] - p) * easeInOut(t));
+        updateRender(displayPositions);
+        if (!animPosOnly) sandT = t;
+        if (t >= 1) {
+          animStartTime = null;
+          animPosOnly   = false;
+          if (animResolve) { animResolve(); animResolve = null; }
+        }
+      }
+      drawSandLive(now / 1000, now);
+      drawFloorParticles(now / 1000, now);
+      drawFlyLayer(now);
+      drawAnnotCardParticles(now / 1000, now);
+      loopRaf = requestAnimationFrame(tick);
+    }
+    loopRaf = requestAnimationFrame(tick);
+  }
+
+  function stopLoop() {
+    if (loopRaf) { cancelAnimationFrame(loopRaf); loopRaf = null; }
+    if (animResolve) { animResolve(); animResolve = null; }
+    animStartTime = null;
+  }
+
+  function stopAll() { stopLoop(); }
+
+  function animateTo(from, target, duration = 1200) {
+    if (!from || from.length !== target.length) {
+      displayPositions = target.slice();
+      updateRender(displayPositions);
+      sandT = 1; fillAnimStartMs = 0;
+      startLoop(); return Promise.resolve();
+    }
+    animFrom        = from.slice();
+    animTarget      = target.slice();
+    animDuration    = duration;
+    animStartTime   = performance.now();
+    fillAnimStartMs = animStartTime;
+    sandT           = 0;
+    return new Promise(resolve => {
+      animResolve = resolve;
+      startLoop();
+    });
+  }
+
+  // Animates letter positions only — does NOT touch sandT (used by transitionAlgo)
+  function animatePositionsOnly(from, target, duration = 1200, onComplete = null) {
+    if (!from || from.length !== target.length) {
+      displayPositions = target.slice();
+      updateRender(displayPositions);
+      if (onComplete) onComplete();
+      startLoop(); return;
+    }
+    animFrom      = from.slice();
+    animTarget    = target.slice();
+    animDuration  = duration;
+    animPosOnly   = true;
+    animStartTime = performance.now();
+    if (onComplete) animResolve = onComplete;
+    startLoop();
+  }
+
+  // ── rebuild ───────────────────────────────────────────
+  async function rebuild(animated) {
+    const text = wordInput.value;
+    if (!currentFont || !text) {
+      letterData = []; lettersLayer.innerHTML = '';
+      annotLayer.innerHTML = ''; annotCardParticles = [];
+      stopLoop();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height);
+      statusEl.textContent = currentFont ? '' : 'loading font…';
+      updateCursorEl();
+      return;
+    }
+    flyActive  = false;
+    seqActive  = false;
+    seqGapFill = null;
+    computeLayout(text, currentFont);
+    setupElements();
+    buildAllGapParticles();
+
+    const target = algoPositions[activeAlgo] || algoPositions.default || [];
+
+    if (animated) {
+      const startPos = displayPositions.length === target.length ? displayPositions.slice() : target.slice();
+      displayPositions = startPos.slice();
+      updateRender(displayPositions);
+      await animateTo(startPos, target, 1200);
+    } else {
+      animStartTime = null; // cancel any position animation
+      pendingTransTimers.forEach(id => clearTimeout(id));
+      pendingTransTimers = [];
+      displayPositions = target.slice();
+      updateRender(displayPositions);
+      sandT = 1; fillAnimStartMs = 0;
+      startLoop();
+    }
+    updateStatus();
+  }
+
+  // ── status ────────────────────────────────────────────
+  function updateStatus() {
+    if (!letterData.length) { statusEl.textContent = ''; return; }
+    const pos = algoPositions[activeAlgo] || algoPositions.default || [];
+    const areas = [];
+    for (let i = 0; i < letterData.length - 1; i++) {
+      const a = letterData[i], b = letterData[i+1];
+      if (a.isSpace || b.isSpace) continue;
+      areas.push(poolArea(a, b, pos[i+1] - pos[i]));
+    }
+    const labels = { default: 'default', floor: 'floor', balanced: 'balanced', optical: 'optical ✦' };
+    const mode = labels[activeAlgo] || activeAlgo;
+    if (!areas.length) { statusEl.textContent = mode; return; }
+    const mn = Math.min(...areas), mx = Math.max(...areas);
+    const mean = areas.reduce((s, a) => s + a, 0) / areas.length;
+    const sig  = Math.sqrt(areas.reduce((s, a) => s + (a - mean) ** 2, 0) / areas.length);
+    statusEl.textContent =
+      `${mode}\npairs ${areas.length}  σ ${Math.round(sig)}\nmin ${Math.round(mn)}  max ${Math.round(mx)} px²`;
+  }
+
+  // ── compare ───────────────────────────────────────────
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function runCompare() {
+    if (comparing) return;
+    comparing = true;
+    compareBtn.classList.add('on');
+    const saved  = activeAlgo;
+    const defPos = algoPositions.default || [];
+    const curPos = algoPositions[activeAlgo] || defPos;
+    for (let i = 0; i < 2; i++) {
+      activeAlgo = 'default'; syncAlgo();
+      await animateTo(displayPositions.slice(), defPos, 550); await wait(350);
+      activeAlgo = saved; syncAlgo();
+      await animateTo(displayPositions.slice(), curPos, 550); await wait(350);
+    }
+    activeAlgo = saved; syncAlgo(); updateStatus();
+    compareBtn.classList.remove('on'); comparing = false;
+  }
+
+  function syncAlgo() {
+    algoBtns.forEach(b => b.classList.toggle('on', b.dataset.algo === activeAlgo));
+    const ind = document.querySelector('.algo-tab-indicator');
+    if (ind) {
+      const activeBtn = document.querySelector(`.algo-btn[data-algo="${activeAlgo}"]`);
+      if (activeBtn) {
+        ind.style.left  = activeBtn.offsetLeft + 'px';
+        ind.style.width = activeBtn.offsetWidth + 'px';
+      }
+    }
+  }
+
+  // ── events ────────────────────────────────────────────
+  let wordAnimTimer = null;
+  wordInput.addEventListener('input', () => {
+    // Clear any visible tooltips and annotation lines immediately on edit
+    hoveredGapIdx = -1;
+    annotLayer.innerHTML = '';
+    annotCardParticles = [];
+    letterEls.forEach(el => { if (el) el.style.opacity = '1'; });
+    // While typing: show default spacing with gray dots instantly (no fill animation)
+    if (activeAlgo !== 'default') { activeAlgo = 'default'; syncAlgo(); }
+    rebuild(false);
+    clearTimeout(wordAnimTimer);
+    // After typing stops: 1.5s pause, then pink drops → green arrives
+    wordAnimTimer = setTimeout(() => { if (wordInput.value) canvasWrap.blur(); transitionAlgo('optical'); }, 500);
+  });
+
+  // ── canvas editing ────────────────────────────────────
+  canvasWrap.addEventListener('focus', () => {
+    const wasEditing = canvasEditMode;
+    canvasEditMode = true;
+    if (!wasEditing) cursorPos = wordInput.value.length;
+    updateCursorEl();
+  });
+
+  document.getElementById('cCursor').addEventListener('input', e => {
+    document.documentElement.style.setProperty('--cursor-color', e.target.value);
+  });
+
+  canvasWrap.addEventListener('blur', () => {
+    canvasEditMode = false;
+    wordSelected = false;
+    svgCursor.setAttribute('display', 'none');
+    svgSelection.setAttribute('display', 'none');
+  });
+
+  canvasWrap.addEventListener('click', (e) => {
+    if (!letterData.length || !displayPositions.length) return; // stay focused so user can type
+    const sr = stage.getBoundingClientRect();
+    const svgX = (e.clientX - sr.left) / sr.width * VIEWBOX_W;
+    const svgY = (e.clientY - sr.top)  / sr.height * VIEWBOX_H;
+    const pos = centered(displayPositions);
+    // Blur if click is clearly outside the word's ink bounds
+    const inked = letterData.filter(d => !d.isSpace);
+    if (inked.length) {
+      const pad   = FONT_SIZE * 0.12;
+      const wLeft = pos[0] + letterData[0].inkLeft - pad;
+      const last  = letterData[letterData.length - 1];
+      const wRight = pos[letterData.length - 1] + (last.isSpace ? last.advance : last.inkRight) + pad;
+      const wTop   = Math.min(...inked.map(d => d.inkTop))    - pad;
+      const wBot   = Math.max(...inked.map(d => d.inkBottom)) + pad;
+      if (svgX < wLeft || svgX > wRight || svgY < wTop || svgY > wBot) {
+        canvasWrap.blur(); return;
+      }
+    }
+    // Find the cursor position (0..word.length) nearest to the click
+    let best = 0, bestDist = Infinity;
+    for (let i = 0; i <= letterData.length; i++) {
+      let cx;
+      if (i === 0) {
+        const d = letterData[0];
+        cx = d && !d.isSpace ? pos[0] + d.inkLeft : pos[0];
+      } else if (i === letterData.length) {
+        const d = letterData[letterData.length - 1];
+        cx = d && !d.isSpace ? pos[i - 1] + d.inkRight : pos[i - 1] + (d ? d.advance : 0);
+      } else {
+        const prev = letterData[i - 1], cur = letterData[i];
+        const prevR = prev && !prev.isSpace ? pos[i - 1] + prev.inkRight : pos[i - 1] + (prev ? prev.advance : 0);
+        const curL  = cur  && !cur.isSpace  ? pos[i]     + cur.inkLeft   : pos[i];
+        cx = (prevR + curL) / 2;
+      }
+      const dist = Math.abs(svgX - cx);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    cursorPos = Math.max(0, Math.min(wordInput.value.length, best));
+    wordSelected = false;
+    updateCursorEl();
+  });
+
+  canvasWrap.addEventListener('dblclick', (e) => {
+    if (!letterData.length) return;
+    wordSelected = true;
+    updateCursorEl();
+    e.preventDefault();
+  });
+
+  canvasWrap.addEventListener('keydown', (e) => {
+    if (!canvasEditMode) return;
+    const word = wordInput.value;
+    if (e.key === 'Escape') { canvasWrap.blur(); e.preventDefault(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+      wordSelected = true; updateCursorEl(); e.preventDefault(); return;
+    }
+
+    // Selection mode: any edit clears the word; arrows just deselect
+    if (wordSelected) {
+      wordSelected = false;
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        wordInput.value = ''; cursorPos = 0;
+        wordInput.dispatchEvent(new Event('input'));
+        e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'Home')  { cursorPos = 0;           updateCursorEl(); e.preventDefault(); return; }
+      if (e.key === 'ArrowRight' || e.key === 'End')  { cursorPos = word.length; updateCursorEl(); e.preventDefault(); return; }
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        wordInput.value = e.key; cursorPos = 1;
+        wordInput.dispatchEvent(new Event('input'));
+        e.preventDefault(); return;
+      }
+      updateCursorEl(); return;
+    }
+
+    if (e.key === 'ArrowLeft')  { cursorPos = Math.max(0, cursorPos - 1); updateCursorEl(); e.preventDefault(); return; }
+    if (e.key === 'ArrowRight') { cursorPos = Math.min(word.length, cursorPos + 1); updateCursorEl(); e.preventDefault(); return; }
+    if (e.key === 'Home') { cursorPos = 0; updateCursorEl(); e.preventDefault(); return; }
+    if (e.key === 'End')  { cursorPos = word.length; updateCursorEl(); e.preventDefault(); return; }
+    if (e.key === 'Backspace') {
+      if (cursorPos > 0) {
+        wordInput.value = word.slice(0, cursorPos - 1) + word.slice(cursorPos);
+        cursorPos--;
+        wordInput.dispatchEvent(new Event('input'));
+      }
+      e.preventDefault(); return;
+    }
+    if (e.key === 'Delete') {
+      if (cursorPos < word.length) {
+        wordInput.value = word.slice(0, cursorPos) + word.slice(cursorPos + 1);
+        wordInput.dispatchEvent(new Event('input'));
+      }
+      e.preventDefault(); return;
+    }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const next = word.slice(0, cursorPos) + e.key + word.slice(cursorPos);
+      if (next.length <= 22) {
+        wordInput.value = next;
+        cursorPos++;
+        wordInput.dispatchEvent(new Event('input'));
+      }
+      e.preventDefault(); return;
+    }
+  });
+
+  function applyWordInputFont() {
+    wordInput.style.fontFamily = `"__kern_${cssFontKey}", sans-serif`;
+  }
+
+  fontSelect.addEventListener('change', async () => {
+    statusEl.textContent = 'loading…';
+    statusEl.classList.remove('error');
+    try {
+      currentFont = await loadFont(fontSelect.value);
+      fontMetrics = computeFontMetrics(currentFont);
+      applyWordInputFont();
+      await rebuild(false);
+    } catch (e) {
+      statusEl.textContent = `failed: ${e.message || e}`;
+      statusEl.classList.add('error');
+    }
+  });
+
+  algoBtns.forEach(btn => btn.addEventListener('click', () => {
+    transitionAlgo(btn.dataset.algo);
+  }));
+
+  sandBtn.addEventListener('click', () => {
+    showSand = !showSand;
+    sandBtn.classList.toggle('on', showSand);
+    sandBtn.textContent = showSand ? 'Sand ✓' : 'Sand';
+    if (!showSand) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      seqActive = false; seqGapFill = null;
+      stopLoop();
+    } else {
+      sandT = 1; fillAnimStartMs = 0;
+      startLoop();
+    }
+  });
+
+  // ── gap hover annotations ─────────────────────────────
+  const annotLayer = document.getElementById('annotLayer');
+
+  // ── callout annotation data ────────────────────────────
+  // Each entry: { s:'a'|'b'|'gap', x:0–1, y:0–1, t:'label', d:'−'|'+'|'!' }
+  // d = directional effect on apparent gap:
+  //   '−' curves / apertures / crossbars optically SHRINK the gap (pair can be tighter)
+  //   '+' voids / dead air / open fields optically INFLATE the gap (needs compensation)
+  //   '!' legibility warning (not a spacing direction)
+  const CALLOUT_DATA = {
+    // shape-class pairs
+    'straight+straight': [
+      { s:'a', x:0.96, y:0.5,  t:'vertical stem',   d:null },
+    ],
+    'straight+round': [
+      { s:'a', x:0.96, y:0.5,  t:'flat wall',        d:null },
+      { s:'b', x:0.04, y:0.45, t:'curved entry',     d:'−' },
+    ],
+    'round+straight': [
+      { s:'a', x:0.96, y:0.45, t:'curved exit',      d:'−' },
+      { s:'b', x:0.04, y:0.5,  t:'flat wall',        d:null },
+    ],
+    'round+round': [
+      { s:'a', x:0.96, y:0.45, t:'curved exit',      d:'−' },
+      { s:'b', x:0.04, y:0.45, t:'curved entry',     d:'−' },
+      { s:'gap', x:0.5, y:0.5, t:'mutual recession', d:'−' },
+    ],
+    'diagonal+straight': [
+      { s:'a', x:0.75, y:0.88, t:'sloped exit',      d:'−' },
+      { s:'b', x:0.04, y:0.5,  t:'flat wall',        d:null },
+    ],
+    'straight+diagonal': [
+      { s:'a', x:0.96, y:0.5,  t:'flat wall',        d:null },
+      { s:'b', x:0.2,  y:0.88, t:'sloped entry',     d:'−' },
+    ],
+    'diagonal+round': [
+      { s:'a', x:0.75, y:0.88, t:'sloped exit',      d:'−' },
+      { s:'b', x:0.04, y:0.45, t:'curved entry',     d:'−' },
+    ],
+    'round+diagonal': [
+      { s:'a', x:0.96, y:0.45, t:'curved exit',      d:'−' },
+      { s:'b', x:0.2,  y:0.88, t:'sloped entry',     d:'−' },
+    ],
+    'diagonal+diagonal': [
+      { s:'a', x:0.78, y:0.88, t:'right diagonal',   d:'−' },
+      { s:'b', x:0.22, y:0.88, t:'left diagonal',    d:'−' },
+      { s:'gap', x:0.5, y:0.08, t:'bright void',     d:'+' },
+    ],
+    // specific pairs
+    'AV': [
+      { s:'a', x:0.82, y:0.88, t:'right leg',        d:'−' },
+      { s:'b', x:0.18, y:0.88, t:'left leg',         d:'−' },
+      { s:'gap', x:0.5, y:0.06, t:'optical void',    d:'+' },
+    ],
+    'VA': [
+      { s:'a', x:0.78, y:0.88, t:'right leg',        d:'−' },
+      { s:'b', x:0.22, y:0.88, t:'left leg',         d:'−' },
+      { s:'gap', x:0.5, y:0.06, t:'optical void',    d:'+' },
+    ],
+    'AW': [
+      { s:'a', x:0.82, y:0.88, t:'right leg',        d:'−' },
+      { s:'b', x:0.2,  y:0.88, t:'outer diagonal',   d:'−' },
+    ],
+    'WA': [
+      { s:'a', x:0.8,  y:0.88, t:'outer diagonal',   d:'−' },
+      { s:'b', x:0.18, y:0.88, t:'left leg',         d:'−' },
+    ],
+    'AY': [
+      { s:'a', x:0.82, y:0.88, t:'right leg',        d:'−' },
+      { s:'b', x:0.18, y:0.48, t:'left branch',      d:'−' },
+    ],
+    'TA': [
+      { s:'a', x:0.9,  y:0.04, t:'crossbar arm',     d:'−' },
+      { s:'b', x:0.2,  y:0.88, t:'left leg slope',   d:'−' },
+    ],
+    'TO': [
+      { s:'a', x:0.9,  y:0.04, t:'crossbar arm',     d:'−' },
+      { s:'b', x:0.5,  y:0.04, t:'round crown',      d:'−' },
+    ],
+    'TE': [
+      { s:'a', x:0.9,  y:0.04, t:'crossbar arm',     d:'−' },
+      { s:'b', x:0.08, y:0.04, t:'top bar echo',     d:'−' },
+    ],
+    'LT': [
+      { s:'a', x:0.9,  y:0.88, t:'open corner',      d:'+' },
+      { s:'b', x:0.88, y:0.04, t:'hanging arm',      d:'+' },
+    ],
+    'LV': [
+      { s:'a', x:0.9,  y:0.5,  t:'open right field', d:'+' },
+      { s:'b', x:0.2,  y:0.88, t:'left diagonal',    d:'−' },
+    ],
+    'te': [
+      { s:'a', x:0.88, y:0.33, t:'crossbar',         d:'−' },
+      { s:'b', x:0.04, y:0.42, t:'open aperture',    d:'−' },
+    ],
+    'et': [
+      { s:'a', x:0.9,  y:0.42, t:'open aperture',    d:'−' },
+      { s:'b', x:0.12, y:0.33, t:'crossbar',         d:'−' },
+    ],
+    'to': [
+      { s:'a', x:0.88, y:0.33, t:'crossbar',         d:'−' },
+      { s:'b', x:0.5,  y:0.04, t:'round crown',      d:'−' },
+    ],
+    'ot': [
+      { s:'a', x:0.5,  y:0.04, t:'round crown',      d:'−' },
+      { s:'b', x:0.12, y:0.33, t:'crossbar',         d:'−' },
+    ],
+    'ta': [
+      { s:'a', x:0.88, y:0.33, t:'crossbar',         d:'−' },
+      { s:'b', x:0.5,  y:0.15, t:'round shoulder',   d:'−' },
+    ],
+    'at': [
+      { s:'a', x:0.9,  y:0.45, t:'round exit',       d:'−' },
+      { s:'b', x:0.12, y:0.33, t:'crossbar',         d:'−' },
+    ],
+    'ea': [
+      { s:'a', x:0.92, y:0.42, t:'open aperture',    d:'−' },
+      { s:'b', x:0.04, y:0.45, t:'round entry',      d:'−' },
+    ],
+    'fi': [
+      { s:'a', x:0.9,  y:0.28, t:'f arm',            d:'−' },
+      { s:'b', x:0.5,  y:0.22, t:'stem top',         d:null },
+    ],
+    'ff': [
+      { s:'a', x:0.9,  y:0.28, t:'first arm',        d:'−' },
+      { s:'b', x:0.1,  y:0.28, t:'second arm',       d:'−' },
+    ],
+    'rn': [
+      { s:'a', x:0.92, y:0.24, t:'arm shelf',        d:'+' },
+      { s:'b', x:0.08, y:0.28, t:'arch shoulder',    d:'−' },
+      { s:'gap', x:0.5, y:0.15, t:'m illusion',      d:'!' },
+    ],
+    'cl': [
+      { s:'a', x:0.92, y:0.45, t:'open bowl',        d:'−' },
+      { s:'b', x:0.06, y:0.45, t:'stem',             d:null },
+      { s:'gap', x:0.5, y:0.45, t:'d trap',          d:'!' },
+    ],
+    'oo': [
+      { s:'a', x:0.96, y:0.45, t:'curved exit',      d:'−' },
+      { s:'b', x:0.04, y:0.45, t:'curved entry',     d:'−' },
+    ],
+    'ra': [
+      { s:'a', x:0.94, y:0.22, t:'arm shelf',        d:'+' },
+      { s:'b', x:0.5,  y:0.45, t:'round body',       d:'−' },
+    ],
+    'ar': [
+      { s:'a', x:0.92, y:0.45, t:'round exit',       d:'−' },
+      { s:'b', x:0.06, y:0.22, t:'arm undercut',     d:'−' },
+    ],
+    'er': [
+      { s:'a', x:0.92, y:0.42, t:'open aperture',    d:'−' },
+      { s:'b', x:0.06, y:0.22, t:'arm void',         d:'+' },
+    ],
+    're': [
+      { s:'a', x:0.92, y:0.22, t:'arm shelf',        d:'+' },
+      { s:'b', x:0.04, y:0.42, t:'curved back',      d:'−' },
+    ],
+    'Ke': [
+      { s:'a', x:0.88, y:0.65, t:'diagonal leg',     d:'−' },
+      { s:'b', x:0.04, y:0.42, t:'open aperture',    d:'−' },
+    ],
+    'ke': [
+      { s:'a', x:0.88, y:0.65, t:'diagonal leg',     d:'−' },
+      { s:'b', x:0.04, y:0.42, t:'open aperture',    d:'−' },
+    ],
+    'ri': [
+      { s:'a', x:0.92, y:0.24, t:'arm shelf',        d:'+' },
+      { s:'b', x:0.5,  y:0.5,  t:'vertical stem',    d:null },
+    ],
+    'ir': [
+      { s:'a', x:0.5,  y:0.5,  t:'vertical stem',    d:null },
+      { s:'b', x:0.08, y:0.24, t:'arm zone',         d:'+' },
+    ],
+    'nu': [
+      { s:'a', x:0.92, y:0.6,  t:'arch curl',        d:'−' },
+      { s:'b', x:0.08, y:0.6,  t:'arch curl',        d:'−' },
+    ],
+    'nt': [
+      { s:'a', x:0.92, y:0.6,  t:'arch descent',     d:'−' },
+      { s:'b', x:0.88, y:0.33, t:'crossbar',         d:'−' },
+    ],
+  };
+
+  const FEATURE_DESC = {
+    'vertical stem':    'Two flat walls facing each other — the reference pair that sets the spacing tempo everything else must match.',
+    'flat wall':        'A vertical edge with no optical recession. Holds the full measured distance; the adjacent form must compensate.',
+    'curved exit':      'The round curve recedes on departure, letting the pair sit closer than the raw measurement suggests.',
+    'curved entry':     'The incoming curve pulls back visually — less physical space reads as the same optical gap.',
+    'mutual recession': 'Both curves recede simultaneously. The pair can be significantly tighter than two flat walls.',
+    'sloped exit':      'The diagonal angle reduces effective confrontation with the next letter, narrowing the optical gap.',
+    'sloped entry':     'The slope converges toward the preceding letter, reducing the visual width of the gap from entry.',
+    'open aperture':    'The opening absorbs space from the adjacent letter — the gap reads smaller than its measured width.',
+    'crossbar':         'The horizontal bar bridges the gap at mid-height, creating an optical link that allows tighter spacing.',
+    'crossbar arm':     'The arm reaches across the gap, optically closing a distance that the measurement keeps open.',
+    'round crown':      'The curved top recedes under the crossbar, drawing both forms optically closer together.',
+    'round shoulder':   'The curved shoulder gives back space on entry, reducing the required physical gap.',
+    'round body':       'The rounded form recedes from its neighbor, permitting a tighter physical placement.',
+    'round exit':       'The round departure gives back optical space, reducing the gap the eye expects to see.',
+    'round entry':      'The curved opening recedes from the preceding letter, tightening the apparent distance.',
+    'f arm':            'The f arm extends toward the adjacent stem at the same height, nearly bridging the gap optically.',
+    'first arm':        'The first arm hovers at x-height — together the two arms create a near-ligature situation.',
+    'second arm':       'The second arm echoes the first at nearly the same height, reinforcing the optical bridge.',
+    'arm shelf':        'The arm creates a shelf of dead air above the gap — inflating the overall optical impression.',
+    'arm void':         'The oblique arm carves a triangular void, making the effective gap larger at the critical reading height.',
+    'arm undercut':     'The undercut allows the adjacent letter to approach more closely at the key zone.',
+    'arm zone':         'The arm creates dead space above — the lower gap does the work, but the arm adds apparent air.',
+    'open bowl':        'The open counter faces the gap and absorbs adjacent space, optically tightening the pair.',
+    'open corner':      'The open corner creates a pocket of dead air that reads as added gap width — requires compensation.',
+    'hanging arm':      'The suspended arm leaves a void above the stems. The visual weight of that air makes the pair read loose.',
+    'open right field': 'The wide open right side creates an expanse of unstructured air, amplifying the perceived gap.',
+    'right leg':        'The diagonal right leg converges toward the adjacent letter, bringing the forms optically closer at the base.',
+    'left leg':         'The diagonal left leg converges toward the preceding letter, creating optical closeness at the base.',
+    'outer diagonal':   'The outer sloped stroke angles toward the gap, reducing perceived distance at the meeting point.',
+    'left branch':      'The branching diagonal pulls visually toward the preceding letter, tightening the upper zone.',
+    'left leg slope':   'The sloped left edge converges with the preceding crossbar arm, reducing required spacing.',
+    'top bar echo':     'The top bar mirrors the crossbar height — a visual bridge that allows tighter placement.',
+    'bright void':      'The converging diagonals create a bright triangular void. Without tightening, this pool reads as a canyon.',
+    'optical void':     'Opposing diagonals create a high-contrast light pocket that reads much wider than its measured width.',
+    'diagonal leg':     'The diagonal stroke converges toward the adjacent letter\'s near edge, optically tightening the pair.',
+    'arch curl':        'The arch\'s curved exit mirrors the next arch\'s entry — the two curls reach toward each other.',
+    'arch shoulder':    'The arching shoulder entry reduces the effective gap depth at the x-height zone.',
+    'arch descent':     'The arch descends cleanly to baseline before the crossbar bridges overhead.',
+    'stem top':         'The stem rises to a clean horizontal — no arm or hook to bridge the adjacent gap.',
+    'stem':             'A plain vertical stroke with no optical recession. The gap reads at its exact measured width.',
+    'm illusion':       'Too close and the brain merges these into \'m\'. Too loose breaks rhythm. The safe zone is narrow.',
+    'd trap':           'Excessive tightening merges c\'s open bowl with l\'s stem into a false \'d\' — a classic legibility trap.',
+  };
+
+  const FEATURE_EFFECT = {
+    'vertical stem':    'Two straight edges face each other here. Tightened a bit to match the overall spacing.',
+    'flat wall':        'A flat side faces the next letter. Tightened to keep the spacing consistent.',
+    'curved exit':      'The letter curves away as it exits, naturally pulling the next letter a little closer.',
+    'curved entry':     'The curve pulls back at entry, reducing the space between these two letters.',
+    'mutual recession': 'Both letters curve inward, so the gap is smaller than the actual distance suggests.',
+    'sloped exit':      'The sloping exit narrows the visible gap between these two letters.',
+    'sloped entry':     'The inward slope brings these letters visually closer together.',
+    'open aperture':    'The open side draws in neighboring space, making the gap feel tighter.',
+    'crossbar':         'The crossbar reaches across and visually connects the two letters.',
+    'crossbar arm':     'The arm extends across, visually closing the space between them.',
+    'round crown':      'The rounded top recedes under the crossbar, giving this pair a little more breathing room.',
+    'round shoulder':   'The curved shoulder arches away, giving back a little space on this side.',
+    'round body':       'The round body naturally pulls away from its neighbor, adding space between them.',
+    'round exit':       'The rounded exit reduces the gap you see between this pair.',
+    'round entry':      'The curve at entry pulls back, shrinking the space here.',
+    'f arm':            'The arm gets very close to the next letter, visually compressing the gap.',
+    'first arm':        'The arm nearly meets the next letter, making them read as almost touching.',
+    'second arm':       'A second arm stacks on top of the first, tightening the pair even more.',
+    'arm shelf':        'The flat shelf traps a pocket of space, making the gap look wider than it really is.',
+    'arm void':         'The empty space behind the arm makes the gap read looser than it measures.',
+    'arm undercut':     'The undercut lets the next letter sit a little closer in, tightening the pair.',
+    'arm zone':         'Open space in the arm area pushes these letters apart visually.',
+    'open bowl':        'The open side of the bowl pulls in space from next door.',
+    'open corner':      'The open corner traps a pocket of air, making the gap look wider.',
+    'hanging arm':      'The hanging arm leaves loose space below it, making the pair read wider.',
+    'open right field': 'A wide open right side creates a lot of unstructured space, making the gap feel larger.',
+    'right leg':        'The leg angles inward at the base, drawing these letters a little closer.',
+    'left leg':         'The leg angles inward at the base, pulling this pair a little tighter.',
+    'outer diagonal':   'The diagonal edge reduces the perceived distance between these letters.',
+    'left branch':      'The branch tightens up the space in the upper zone of the pair.',
+    'left leg slope':   'The sloped leg angles in toward the crossbar, tightening the gap.',
+    'top bar echo':     'The top bar reaches across and visually bridges the gap between them.',
+    'bright void':      'The open space between these diagonals creates a gap that reads very wide.',
+    'optical void':     'This gap reads wider than it actually measures.',
+    'diagonal leg':     'The diagonal leg angles toward the near edge, reducing the visible gap.',
+    'arch curl':        'The two arches curve toward each other, pulling the letters a little closer.',
+    'arch shoulder':    'The curved shoulder reduces the gap right at the x-height.',
+    'arch descent':     'The arch descends cleanly into the space before the crossbar.',
+    'stem top':         'Nothing bridges across here, so the space reads at its full width.',
+    'stem':             'The straight stem holds its full measured width.',
+    'm illusion':       'Too close together, these letters blend into an "m" shape when read quickly.',
+    'd trap':           'Too close together, these letters can read as a single "d".',
+  };
+
+  function capWords(s) { return s.replace(/\b\w/g, c => c.toUpperCase()); }
+  function hexOpRgba(hex, op) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${op})`;
+  }
+  function refreshAnnotations() { if (hoveredGapIdx >= 0) showGapAnnotations(hoveredGapIdx); }
+
+  function _buildAnnotatedPairSvg_unused(a, b, tipDx) {
+    const margin = 8;
+    const vbL = a.inkLeft - margin;
+    const vbT = Math.min(a.inkTop, b.inkTop) - margin;
+    const vbW = tipDx + b.inkRight + margin - vbL;
+    const vbH = Math.max(a.inkBottom, b.inkBottom) + margin - vbT;
+
+    // Fixed output viewport (viewBox units ≈ px at 380px tooltip width)
+    const OUT_W = 336, OUT_H = 142;
+    const LTR_H  = 92;   // px of vertical space for the letters
+    const LABEL_Y = 122; // y where label text baseline sits
+    const DOT_R = 2.2, LINE_W = 0.65, FONT_SZ = 8.5;
+
+    // Scale letters to fill the letter zone
+    const s = Math.min(LTR_H / vbH, (OUT_W - 28) / vbW) * 0.92;
+    const tx = (OUT_W - vbW * s) / 2;
+    const ty = (LTR_H - vbH * s) / 2 + 2;
+
+    function toOut(px, py) {
+      return [(px - vbL) * s + tx, (py - vbT) * s + ty];
+    }
+
+    // Letter ink bounds in path coords
+    const aL=a.inkLeft, aR=a.inkRight, aT=a.inkTop, aB=a.inkBottom;
+    const bL=tipDx+b.inkLeft, bR=tipDx+b.inkRight, bT=b.inkTop, bB=b.inkBottom;
+    const gL=a.inkRight, gR=tipDx+b.inkLeft;
+    const gT=Math.max(aT,bT), gB=Math.min(aB,bB);
+
+    // Look up callout definitions
+    const pairKey = `${a.char}${b.char}`;
+    const pairKeyLC = `${a.char.toLowerCase()}${b.char.toLowerCase()}`;
+    const classKey  = `${shapeClass(a.char)}+${shapeClass(b.char)}`;
+    const rawCallouts = CALLOUT_DATA[pairKey] || CALLOUT_DATA[pairKeyLC] || CALLOUT_DATA[classKey] || [];
+
+    // Resolve feature points to output coords
+    const features = [];
+    for (const c of rawCallouts) {
+      let px, py;
+      if (c.s === 'a') {
+        px = aL + c.x * (aR - aL); py = aT + c.y * (aB - aT);
+      } else if (c.s === 'b') {
+        px = bL + c.x * (bR - bL); py = bT + c.y * (bB - bT);
+      } else {
+        if (gR - gL < 2) continue;
+        px = gL + c.x * Math.max(0, gR - gL);
+        py = gT + c.y * Math.max(1, gB - gT);
+      }
+      const [ox, oy] = toOut(px, py);
+      features.push({ ox, oy, t: c.t, d: c.d });
+    }
+
+    // Place labels with minimum horizontal spacing
+    const MIN_SEP = 88;
+    const order = features.map((f, i) => ({ x: Math.max(26, Math.min(OUT_W - 26, f.ox)), i }))
+                          .sort((a, b) => a.x - b.x);
+    const placed = new Array(features.length);
+    order.forEach(({ x, i }, rank) => {
+      if (rank > 0 && x - placed[order[rank - 1].i] < MIN_SEP)
+        x = placed[order[rank - 1].i] + MIN_SEP;
+      placed[i] = Math.min(OUT_W - 26, x);
+    });
+
+    // Build annotation markup
+    const annot = features.map((f, i) => {
+      const lx = placed[i];
+      const lineEndY = LABEL_Y - FONT_SZ - 3;
+      return (
+        `<circle cx="${f.ox.toFixed(1)}" cy="${f.oy.toFixed(1)}" r="${DOT_R}" fill="rgba(255,255,255,0.38)"/>` +
+        `<line x1="${f.ox.toFixed(1)}" y1="${(f.oy + DOT_R + 1).toFixed(1)}" x2="${lx.toFixed(1)}" y2="${lineEndY.toFixed(1)}" stroke="rgba(255,255,255,0.18)" stroke-width="${LINE_W}" stroke-linecap="round"/>` +
+        `<text x="${lx.toFixed(1)}" y="${LABEL_Y}" font-family="-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif" font-size="${FONT_SZ}" fill="rgba(255,255,255,0.38)" text-anchor="middle">${f.t}</text>`
+      );
+    }).join('');
+
+    const gtx = (tx - vbL * s).toFixed(3);
+    const gty = (ty - vbT * s).toFixed(3);
+
+    return `<svg viewBox="0 0 ${OUT_W} ${OUT_H}" xmlns="http://www.w3.org/2000/svg" width="calc(100% + 44px)" style="display:block;margin:8px -22px 10px">
+      <g transform="translate(${gtx},${gty}) scale(${s.toFixed(4)})">
+        <path d="${a.svg}" fill="${typeColor}"/>
+        <path d="${b.svg}" fill="${typeColor}" transform="translate(${tipDx.toFixed(2)},0)"/>
+      </g>
+      ${annot}
+    </svg>`;
+  }
+
+  // ── inline gap annotations ────────────────────────────
+  function wrapWords(str, maxChars) {
+    const words = str.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (test.length > maxChars && cur) { lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function svgEl(tag, attrs, text) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+
+  const PILL_LABEL = { '−': 'Shrinks the Gap', '+': 'Inflates the Gap', '!': 'Legibility Risk', null: 'Reference Pair' };
+  const PILL_TEXT  = { '−': '#191a19', '+': '#191a19', '!': '#191a19', null: '#c0c0c0' };
+  function getPillBg(d) {
+    if (d === '−') return annotNegColor;
+    if (d === '+') return annotPosColor;
+    if (d === '!') return annotRiskColor;
+    return '#444844';
+  }
+  const ANNOT_FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif";
+
+  function placeAnnotation(fx, fy, callout, anchorX, anchorY, side, kerningDelta) {
+    // For reference pairs (d===null) shown as fallback, derive pill from the gap sign
+    const effectiveD = (callout.d === null && kerningDelta !== 0)
+      ? (kerningDelta < 0 ? '−' : '+')
+      : callout.d;
+    const PREFIX_LABEL = { '−': 'Shrinks the gap', '+': 'Inflates the gap', '!': 'Legibility risk', null: 'Optically adjusted' };
+    const prefixText = PREFIX_LABEL[effectiveD] || null;
+    const name       = capWords(callout.t);
+    const effect     = FEATURE_EFFECT[callout.t] || '';
+    const CPX = annotCardPad, CPY = annotCardPad, CR = annotCardRadius;
+
+    const SENT_MAX_CHARS = 30;
+    const sentLines  = effect ? wrapWords(effect, SENT_MAX_CHARS) : [];
+    const sentLH     = Math.ceil(Math.max(annotPrefixSz, annotSentSz) * annotLineH);
+    const prefixW    = prefixText ? prefixText.length * annotPrefixSz * 0.60 : 0;
+    const effectW    = Math.max(0, ...sentLines.map(l => l.length)) * annotSentSz * 0.57;
+
+    // Direction color used for callout dot, line, card dots, and number label
+    const dotColor = callout.d === '!' ? annotRiskColor : kerningDelta < 0 ? annotNegColor : kerningDelta > 0 ? annotPosColor : 'rgba(255,255,255,0.7)';
+
+    const PILE_H     = 55;   // SVG units for the falling-dot zone inside the card
+    const DELTA_NUM_SZ = annotDeltaSz;
+    const hasDelta   = kerningDelta !== 0;
+    const deltaColor = dotColor;  // falling dots + number label match the callout color
+    const deltaStr   = kerningDelta > 0 ? `+${kerningDelta}` : `${kerningDelta}`;
+    const deltaRowH  = hasDelta ? (PILE_H + 10 + DELTA_NUM_SZ + 10) : 0;
+
+    const prefixRow = prefixText ? sentLH + 4 : 0;
+    const cardW  = Math.max(effectW, prefixW) + CPX * 2;
+    const sentH  = sentLines.length * sentLH;
+    const cardH  = CPY + deltaRowH + prefixRow + (sentLines.length ? sentH + 4 : 0) + CPY;
+
+    let cardX, cardY;
+    if (side === 'left')       { cardX = anchorX - cardW; cardY = anchorY - cardH / 2; }
+    else if (side === 'right') { cardX = anchorX;         cardY = anchorY - cardH / 2; }
+    else                       { cardX = anchorX - cardW / 2; cardY = anchorY; }
+    cardX = Math.max(4, Math.min(VIEWBOX_W - cardW - 4, cardX));
+    cardY = Math.max(4, cardY); // no bottom clamp — overflow: visible handles below-card shadow
+
+    // Non-orthogonal anchor: use feature name as deterministic hash so each
+    // feature gets a consistently diagonal (not perfectly horizontal/vertical) line
+    const nameHash = [...callout.t].reduce((s, c) => s + c.charCodeAt(0), 0) % 1000 / 1000;
+    let leX, leY;
+    if (side === 'left')       { leX = cardX + cardW; leY = cardY + cardH * (0.22 + nameHash * 0.56); }
+    else if (side === 'right') { leX = cardX;          leY = cardY + cardH * (0.22 + nameHash * 0.56); }
+    else                       { leX = cardX + cardW / 2; leY = cardY; }
+
+    if (annotShadow > 0) {
+      const ds = document.querySelector('#annotShadowF feDropShadow');
+      if (ds) ds.setAttribute('stdDeviation', annotShadow);
+    }
+    const shadowAttr = annotShadow > 0 ? { filter: 'url(#annotShadowF)' } : {};
+
+    // ── 1. Line — behind dot in SVG order so dot sits on top ──
+    const lineLen = Math.max(1, Math.hypot(leX - fx, leY - fy));
+    const lineEl  = svgEl('line', {
+      x1: fx.toFixed(1), y1: fy.toFixed(1), x2: leX.toFixed(1), y2: leY.toFixed(1),
+      stroke: dotColor, 'stroke-width': 1.4, 'stroke-linecap': 'round',
+      'stroke-dasharray': lineLen, 'stroke-dashoffset': lineLen
+    });
+    annotLayer.appendChild(lineEl);
+    lineEl.animate(
+      [{ strokeDashoffset: lineLen }, { strokeDashoffset: 0 }],
+      { duration: 180, delay: 60, fill: 'forwards', easing: 'ease-out' }
+    );
+
+    // ── 2. Dot — on top of line ──
+    const dotEl = svgEl('circle', { cx: fx, cy: fy, r: 5.5, fill: dotColor });
+    dotEl.style.cssText = 'animation:annotDotPop 0.12s ease-in-out both; transform-box:fill-box; transform-origin:center;';
+    annotLayer.appendChild(dotEl);
+
+    // ── 3. Card — slides away from letter as it fades in ──
+    const cardG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    // Start slightly toward the letter, slide to final position in the line direction
+    const slideX = side === 'left' ? 14 : side === 'right' ? -14 : 0;
+    const slideY = side === 'below' ? -14 : 0;
+    cardG.animate(
+      [
+        { opacity: 0, transform: `translate(${slideX}px, ${slideY}px)` },
+        { opacity: 1, transform: 'translate(0px, 0px)' }
+      ],
+      { duration: 220, delay: 200, fill: 'both', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    );
+    annotLayer.appendChild(cardG);
+    const add = el => cardG.appendChild(el);
+
+    add(svgEl('rect', {
+      x: cardX.toFixed(1), y: cardY.toFixed(1),
+      width: cardW.toFixed(1), height: cardH.toFixed(1), rx: CR,
+      fill: hexOpRgba(annotCardBgHex, annotCardBgOp), ...shadowAttr
+    }));
+
+    const textX = cardX + CPX;
+    let   curY  = cardY + CPY;
+
+    if (hasDelta) {
+      // Seed falling canvas particles — fall from card ceiling, pile up on floor above number
+      const ceiling  = cardY;              // start fall from very top of card
+      const floor    = cardY + CPY + PILE_H;
+      const pileLeft = cardX + CPX;
+      const pileRight= cardX + cardW - CPX;
+      const maxDots  = Math.min(Math.abs(kerningDelta), 50);
+      const rng      = mkRng(Math.round(cardX * 31 + cardY * 17));
+      const nowMs    = performance.now() + 200; // start when card fades in (matches card slide delay)
+      const stagger  = Math.min(10, 250 / Math.max(1, maxDots));
+      // Tight circular cluster near the left wall
+      const circR  = PILE_H * 0.42;
+      const circCx = pileLeft + circR + 4;
+      const circCy = cardY + CPY + PILE_H * 0.5;  // land in content zone, not padding
+      const circRx = circR;
+      const circRy = circR;
+      const cardDots = [];
+      for (let i = 0; i < maxDots; i++) {
+        const theta = rng() * Math.PI * 2;
+        const r     = Math.sqrt(rng());   // sqrt = uniform fill (not center-heavy)
+        cardDots.push({
+          svgX:    circCx + r * Math.cos(theta) * circRx,
+          svgY:    circCy + r * Math.sin(theta) * circRy,
+          startMs: nowMs + i * stagger,
+          color:   deltaColor,
+          phase:   rng() * Math.PI * 2
+        });
+      }
+      annotCardParticles.push({
+        clip: { x: cardX, y: cardY, w: cardW, h: cardH, r: CR },
+        ceiling, floor, dots: cardDots
+      });
+      curY += PILE_H + 10;   // extra padding above the number
+      add(svgEl('text', {
+        x: textX.toFixed(1), y: (curY + DELTA_NUM_SZ).toFixed(1),
+        'text-anchor': 'start', 'font-family': '"Space Mono", monospace',
+        'font-size': DELTA_NUM_SZ, 'font-weight': 700, fill: deltaColor
+      }, deltaStr));
+      curY += DELTA_NUM_SZ + 10;
+    }
+
+    if (prefixText) {
+      add(svgEl('text', {
+        x: textX.toFixed(1), y: (curY + annotPrefixSz).toFixed(1),
+        'text-anchor': 'start', 'font-family': annotFontFamily,
+        'font-size': annotPrefixSz, 'font-weight': annotPrefixWt, fill: dotColor
+      }, prefixText));
+      curY += sentLH + 4;
+    }
+
+    sentLines.forEach((line, i) => {
+      add(svgEl('text', {
+        x: textX.toFixed(1), y: (curY + annotSentSz + i * sentLH).toFixed(1),
+        'text-anchor': 'start', 'font-family': annotFontFamily,
+        'font-size': annotSentSz, 'font-weight': annotSentWt, fill: annotSentHex
+      }, line));
+    });
+  }
+
+  function showGapAnnotations(gapIdx) {
+    annotLayer.innerHTML = '';
+    const a = letterData[gapIdx], b = letterData[gapIdx + 1];
+    if (!a || !b || a.isSpace || b.isSpace) return;
+
+    const pos = centered(displayPositions);
+    const aOx = pos[gapIdx], bOx = pos[gapIdx + 1];
+    const aL = aOx + a.inkLeft,  aR = aOx + a.inkRight;
+    const bL = bOx + b.inkLeft,  bR = bOx + b.inkRight;
+    const aT = a.inkTop, aB = a.inkBottom;
+    const bT = b.inkTop, bB = b.inkBottom;
+    const gL = aOx + a.inkRight, gR = bOx + b.inkLeft;
+    const gT = Math.max(aT, bT), gB = Math.min(aB, bB);
+
+    const pairKey   = `${a.char}${b.char}`;
+    const pairKeyLC = pairKey.toLowerCase();
+    const classKey  = `${shapeClass(a.char)}+${shapeClass(b.char)}`;
+    const callouts  = CALLOUT_DATA[pairKey] || CALLOUT_DATA[pairKeyLC] || CALLOUT_DATA[classKey] || [];
+    if (!callouts.length) return;
+
+    const EDGE = annotCardMargin;
+    const LEFT_X  = Math.max(4, aL - EDGE);
+    const RIGHT_X = Math.min(VIEWBOX_W - 4, bR + EDGE);
+    const BELOW_Y = Math.max(aB, bB) + EDGE + 30;
+
+    // Prefer directional callouts; fall back to reference pairs if that's all there is
+    const directional = callouts.filter(c => c.d !== null);
+    const pool = directional.length > 0 ? directional : callouts.filter(c => c.d === null);
+    const leftC  = pool.filter(c => c.s === 'a');
+    const rightC = pool.filter(c => c.s === 'b');
+    const belowC = pool.filter(c => c.s === 'gap');
+
+    // Get actual kerning delta from particle counts
+    const activeParticles = (gapParticles && gapParticles[gapIdx] ? gapParticles[gapIdx].filter(p => !p.isGray).length : 0);
+    const defaultCount = (gapDefaultCounts && gapDefaultCounts[gapIdx]) || 0;
+    const kerningDelta = activeParticles - defaultCount; // positive = gap is looser, negative = gap is tighter
+
+    // Per-feature delta: positive features get a positive share, negative get negative,
+    // they net to kerningDelta. Dominant-direction features carry the bulk; opposing features
+    // get a small base offset so their sign is always correct and the math sums to the gap label.
+    const numPos  = callouts.filter(c => c.d === '+').length;
+    const numNeg  = callouts.filter(c => c.d === '−').length;
+    const baseMag = Math.max(5, Math.round(Math.abs(kerningDelta) * 0.12));
+    function featureDelta(c) {
+      if (c.d === '!') return 0;
+      if (!c.d) return (numPos + numNeg === 0) ? kerningDelta : 0;
+      if (numPos === 0 || numNeg === 0) {
+        const count = Math.max(1, numPos + numNeg);
+        return (c.d === '+' ? 1 : -1) * Math.round(Math.abs(kerningDelta) / count);
+      }
+      if (kerningDelta >= 0) {
+        if (c.d === '+') return Math.round((kerningDelta + numNeg * baseMag) / numPos);
+        if (c.d === '−') return -baseMag;
+      } else {
+        if (c.d === '−') return -Math.round((Math.abs(kerningDelta) + numPos * baseMag) / numNeg);
+        if (c.d === '+') return baseMag;
+      }
+      return 0;
+    }
+
+    const gapCx = (aR + bL) / 2;  // horizontal center of the gap between A and B
+    leftC.forEach((c, i) => {
+      const fx = gapCx, fy = aT + c.y * (aB - aT);
+      const ay = Math.max(aT + 40, Math.min(VIEWBOX_H - 60, fy + (i - (leftC.length - 1) / 2) * 72));
+      placeAnnotation(fx, fy, c, LEFT_X, ay, 'left', featureDelta(c));
+    });
+    rightC.forEach((c, i) => {
+      const fx = gapCx, fy = bT + c.y * (bB - bT);
+      const ay = Math.max(bT + 40, Math.min(VIEWBOX_H - 60, fy + (i - (rightC.length - 1) / 2) * 72));
+      placeAnnotation(fx, fy, c, RIGHT_X, ay, 'right', featureDelta(c));
+    });
+    const hasDirectional = leftC.length > 0 || rightC.length > 0;
+    belowC.forEach((c, i) => {
+      if (gR - gL < 2) return;
+      const fx = gL + c.x * Math.max(0, gR - gL);
+      // When directional callouts also exist, push the below dot to the bottom of
+      // the gap so its line starts below the left/right lines and they don't cross.
+      const fy = hasDirectional ? gB : gT + c.y * Math.max(1, gB - gT);
+      const cx = Math.max(100, Math.min(VIEWBOX_W - 100,
+        gapCx + (i - (belowC.length - 1) / 2) * 230));
+      placeAnnotation(fx, fy, c, cx, BELOW_Y, 'below', featureDelta(c));
+    });
+  }
+
+  canvas.parentElement.addEventListener('mousemove', e => {
+    // Don't show annotations while dot animation is running
+    if (seqActive || transitionBusy) return;
+
+    const cr = canvas.getBoundingClientRect();
+    const mx = (e.clientX - cr.left) * devicePixelRatio;
+    const my = (e.clientY - cr.top)  * devicePixelRatio;
+
+    let hit = null;
+    for (const h of labelHitAreas) {
+      const dx = mx - h.x, dy = my - h.y;
+      if (dx * dx + dy * dy < h.r * h.r) { hit = h; break; }
+    }
+    if (!hit && displayPositions.length > 1) {
+      const pos = centered(displayPositions);
+      for (let gi = 0; gi < letterData.length - 1; gi++) {
+        const a = letterData[gi], b = letterData[gi + 1];
+        if (a.isSpace || b.isSpace) continue;
+        const [lx1, ly1] = toCanvasPt(pos[gi]     + a.inkLeft,  Math.min(a.inkTop, b.inkTop));
+        const [lx2, ly2] = toCanvasPt(pos[gi + 1] + b.inkRight, Math.max(a.inkBottom, b.inkBottom));
+        if (mx >= lx1 && mx <= lx2 && my >= ly1 && my <= ly2) {
+          hit = labelHitAreas.find(h => h.gapIdx === gi) || { gapIdx: gi, x: (lx1+lx2)/2, y: ly1, r: 0 };
+          break;
+        }
+      }
+    }
+
+    if (!hit) {
+      if (hoveredGapIdx >= 0) {
+        hoveredGapIdx = -1;
+        annotLayer.innerHTML = '';
+        annotCardParticles = [];
+        letterEls.forEach(el => { if (el) el.style.opacity = '1'; });
+      }
+      return;
+    }
+
+    const i = hit.gapIdx;
+    if (hoveredGapIdx !== i) {
+      hoveredGapIdx = i;
+      annotCardParticles = [];
+      letterEls.forEach((el, li) => { if (el) el.style.opacity = (li === i || li === i + 1) ? '1' : '0.05'; });
+      showGapAnnotations(i);
+    }
+  });
+
+  canvas.parentElement.addEventListener('mouseleave', () => {
+    hoveredGapIdx = -1;
+    annotLayer.innerHTML = '';
+    annotCardParticles = [];
+    letterEls.forEach(el => { if (el) el.style.opacity = '1'; });
+  });
+
+  document.getElementById('flyBtn').addEventListener('click', startFlyAnim);
+
+  function flashCopy(btn, text) {
+    navigator.clipboard.writeText(JSON.stringify(text, null, 2)).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+    });
+  }
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    flashCopy(document.getElementById('copyBtn'), {
+      word: wordInput.value, font: fontSelect.value,
+      algo: activeAlgo, tracking,
+      colors: { bg: bgColor, type: typeColor, dots: dotColor, shrinks: annotNegColor, inflates: annotPosColor, risk: annotRiskColor },
+      dots: { size: dotSize, count: dotCount, speed: dotSpeed, amp: dotAmp, opacity: dotOpacity },
+      motion: { speed: seqSpeed, gravity: fallGravity, drift: fallDrift, wobble: fallWobble, magnet: fallMagnet },
+      annotationCards: {
+        bg: annotCardBgHex, bgOpacity: annotCardBgOp,
+        prefixColor: annotTitleHex, prefixSize: annotPrefixSz, prefixWeight: annotPrefixWt,
+        sentenceColor: annotSentHex, sentenceSize: annotSentSz, sentenceWeight: annotSentWt,
+        lineHeight: annotLineH, numberSize: annotDeltaSz,
+        padding: annotCardPad, margin: annotCardMargin, shadow: annotShadow, cornerRadius: annotCardRadius
+      }
+    });
+  });
+
+  document.getElementById('copyGlobalColors').addEventListener('click', e => {
+    flashCopy(e.currentTarget, {
+      shrinks: annotNegColor, inflates: annotPosColor, risk: annotRiskColor,
+      cardDots: annotDotColor, cursor: document.getElementById('cCursor').value
+    });
+  });
+
+  document.getElementById('copyColors').addEventListener('click', e => {
+    flashCopy(e.currentTarget, {
+      bg: bgColor, type: typeColor, dots: dotColor,
+      labels: labelColor, lines: document.getElementById('cConnector').value,
+      lineWeight: connectorWeight, lineOpacity: connectorOpacity
+    });
+  });
+
+  document.getElementById('copyDots').addEventListener('click', e => {
+    flashCopy(e.currentTarget, {
+      size: dotSize, count: dotCount, speed: dotSpeed, amp: dotAmp, opacity: dotOpacity
+    });
+  });
+
+  document.getElementById('copyMotion').addEventListener('click', e => {
+    flashCopy(e.currentTarget, {
+      speed: seqSpeed, gravity: fallGravity, drift: fallDrift, wobble: fallWobble, magnet: fallMagnet
+    });
+  });
+
+  document.getElementById('copyAnnotCards').addEventListener('click', e => {
+    flashCopy(e.currentTarget, {
+      bg: annotCardBgHex, bgOpacity: annotCardBgOp,
+      prefixColor: annotTitleHex, prefixSize: annotPrefixSz, prefixWeight: annotPrefixWt,
+      sentenceColor: annotSentHex, sentenceSize: annotSentSz, sentenceWeight: annotSentWt,
+      lineHeight: annotLineH, numberSize: annotDeltaSz,
+      padding: annotCardPad, margin: annotCardMargin, shadow: annotShadow, cornerRadius: annotCardRadius
+    });
+  });
+  compareBtn.addEventListener('click', runCompare);
+
+  trackingInput.addEventListener('input', () => {
+    tracking = parseInt(trackingInput.value, 10);
+    trackingVal.textContent = (tracking >= 0 ? '+' : '') + tracking;
+    lastTrackTime = performance.now() / 1000;
+    rebuild(false);
+  });
+
+  // ── dot param sliders ─────────────────────────────────
+  function paramSlider(id, valId, setter, rebuild) {
+    document.getElementById(id).addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      setter(v);
+      document.getElementById(valId).textContent = v % 1 === 0 ? v : v.toFixed(2);
+      if (rebuild) { buildAllGapParticles(); }
+    });
+  }
+  paramSlider('pSize',    'pSizeVal',    v => dotSize    = v, false);
+  paramSlider('pCount',   'pCountVal',   v => dotCount   = Math.round(v), true);
+  paramSlider('pSpeed',   'pSpeedVal',   v => dotSpeed   = v, false);
+  paramSlider('pAmp',     'pAmpVal',     v => dotAmp     = v, false);
+  paramSlider('pOpacity', 'pOpacityVal', v => dotOpacity = v, false);
+
+  // ── motion sliders ────────────────────────────────────
+  paramSlider('mSpeed',   'mSpeedVal',   v => seqSpeed    = v,  false);
+  paramSlider('mGravity', 'mGravityVal', v => fallGravity = v,  false);
+  paramSlider('mDrift',   'mDriftVal',   v => fallDrift   = v,  false);
+  paramSlider('mWobble',  'mWobbleVal',  v => fallWobble  = v,  false);
+  paramSlider('mMagnet',  'mMagnetVal',  v => fallMagnet  = v,  false);
+
+  // ── color pickers ─────────────────────────────────────
+  document.getElementById('cBg').addEventListener('input', e => {
+    bgColor = e.target.value;
+    document.body.style.background = bgColor;
+  });
+  document.getElementById('cType').addEventListener('input', e => {
+    typeColor = e.target.value;
+    letterEls.forEach(el => { if (el) el.setAttribute('fill', typeColor); });
+  });
+  document.getElementById('cDots').addEventListener('input', e => {
+    dotColor = e.target.value;
+  });
+  document.getElementById('cLabels').addEventListener('input', e => {
+    labelColor = e.target.value;
+  });
+  document.getElementById('cConnector').addEventListener('input', e => {
+    connectorColor = e.target.value;
+  });
+  paramSlider('pConnectorW',  'pConnectorWVal',  v => connectorWeight  = v, false);
+  paramSlider('pConnectorOp', 'pConnectorOpVal', v => connectorOpacity = v, false);
+
+  function rescaleFloorOffsets() {
+    const spread = FONT_SIZE * floorSpread;
+    floorParticles.forEach(fps => {
+      if (!fps) return;
+      fps.forEach(fp => { fp.xOff = (fp.xOffNorm || 0) * spread; });
+    });
+    rebuildFloorYOffsets();
+  }
+  paramSlider('pFloorSpread',  'pFloorSpreadVal',  v => { floorSpread  = v; rescaleFloorOffsets(); }, false);
+  paramSlider('pFloorScatter', 'pFloorScatterVal', v => { floorScatter = v; rebuildFloorYOffsets(); }, false);
+
+  // Annotation card controls
+  paramSlider('pAnnotBgOp',    'pAnnotBgOpVal',    v => { annotCardBgOp  = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotPad',     'pAnnotPadVal',     v => { annotCardPad   = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotMargin',  'pAnnotMarginVal',  v => { annotCardMargin= v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotShadow',  'pAnnotShadowVal',  v => { annotShadow    = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotPrefixSz', 'pAnnotPrefixSzVal', v => { annotPrefixSz = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotPrefixWt', 'pAnnotPrefixWtVal', v => { annotPrefixWt = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotSentSz',   'pAnnotSentSzVal',   v => { annotSentSz   = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotSentWt',   'pAnnotSentWtVal',   v => { annotSentWt   = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotLineH',    'pAnnotLineHVal',    v => { annotLineH    = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotDeltaSz',  'pAnnotDeltaSzVal',  v => { annotDeltaSz  = v; refreshAnnotations(); }, false);
+  paramSlider('pAnnotRadius',   'pAnnotRadiusVal',   v => { annotCardRadius = v; refreshAnnotations(); }, false);
+  document.getElementById('cAnnotBg').addEventListener('input',    e => { annotCardBgHex = e.target.value; refreshAnnotations(); });
+  document.getElementById('cAnnotTitle').addEventListener('input', e => { annotTitleHex  = e.target.value; refreshAnnotations(); });
+  document.getElementById('cAnnotSent').addEventListener('input',  e => { annotSentHex   = e.target.value; refreshAnnotations(); });
+  const ANNOT_FONTS_SYSTEM = {
+    system: "-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif",
+    mono:   "'Space Mono',monospace",
+    serif:  "Georgia,'Times New Roman',serif"
+  };
+  // Annotation font Google Fonts: loaded into a @font-face via a <style> tag
+  const ANNOT_GF_CSS_NAMES = {
+    'af-inter': 'Inter', 'af-roboto': 'Roboto', 'af-opensans': 'Open Sans',
+    'af-lato': 'Lato', 'af-montserrat': 'Montserrat', 'af-raleway': 'Raleway',
+    'af-nunito': 'Nunito', 'af-dmsans': 'DM Sans', 'af-spacegrotesk': 'Space Grotesk',
+    'af-oswald': 'Oswald', 'af-instrumentserif': 'Instrument Serif',
+    'af-playfairdisplay': 'Playfair Display', 'af-merriweather': 'Merriweather',
+    'af-lora': 'Lora', 'af-cormorantgaramond': 'Cormorant Garamond',
+    'af-dmserifdisplay': 'DM Serif Display', 'af-librebaskerville': 'Libre Baskerville',
+    'af-ebgaramond': 'EB Garamond', 'af-anton': 'Anton',
+    'af-abrilfatface': 'Abril Fatface', 'af-righteous': 'Righteous', 'af-pacifico': 'Pacifico',
+  };
+  const ANNOT_GF_URLS = {
+    'af-inter':            CDN + 'ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf',
+    'af-roboto':           CDN + 'apache/roboto/fonts/ttf/Roboto-Regular.ttf',
+    'af-opensans':         CDN + 'ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf',
+    'af-lato':             CDN + 'ofl/lato/Lato-Regular.ttf',
+    'af-montserrat':       CDN + 'ofl/montserrat/Montserrat%5Bwght%5D.ttf',
+    'af-raleway':          CDN + 'ofl/raleway/Raleway%5Bwght%5D.ttf',
+    'af-nunito':           CDN + 'ofl/nunito/Nunito%5Bwght%5D.ttf',
+    'af-dmsans':           CDN + 'ofl/dmsans/DMSans%5Bopsz%2Cwght%5D.ttf',
+    'af-spacegrotesk':     CDN + 'ofl/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf',
+    'af-oswald':           CDN + 'ofl/oswald/Oswald%5Bwght%5D.ttf',
+    'af-instrumentserif':  CDN + 'ofl/instrumentserif/InstrumentSerif-Regular.ttf',
+    'af-playfairdisplay':  CDN + 'ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf',
+    'af-merriweather':     CDN + 'ofl/merriweather/Merriweather-Regular.ttf',
+    'af-lora':             CDN + 'ofl/lora/Lora%5Bwght%5D.ttf',
+    'af-cormorantgaramond':CDN + 'ofl/cormorantgaramond/CormorantGaramond-Regular.ttf',
+    'af-dmserifdisplay':   CDN + 'ofl/dmserifdisplay/DMSerifDisplay-Regular.ttf',
+    'af-librebaskerville': CDN + 'ofl/librebaskerville/LibreBaskerville-Regular.ttf',
+    'af-ebgaramond':       CDN + 'ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf',
+    'af-anton':            CDN + 'ofl/anton/Anton-Regular.ttf',
+    'af-abrilfatface':     CDN + 'ofl/abrilfatface/AbrilFatface-Regular.ttf',
+    'af-righteous':        CDN + 'ofl/righteous/Righteous-Regular.ttf',
+    'af-pacifico':         CDN + 'ofl/pacifico/Pacifico-Regular.ttf',
+  };
+  const annotFontLoaded = new Set();
+  function loadAnnotFont(key) {
+    if (annotFontLoaded.has(key)) return Promise.resolve();
+    const url = ANNOT_GF_URLS[key];
+    const name = ANNOT_GF_CSS_NAMES[key];
+    if (!url || !name) return Promise.resolve();
+    return new FontFace(`__annot_${key}`, `url(${url})`).load().then(ff => {
+      document.fonts.add(ff);
+      annotFontLoaded.add(key);
+    }).catch(() => {});
+  }
+  document.getElementById('sAnnotFont').addEventListener('change', async e => {
+    const v = e.target.value;
+    if (v.startsWith('af-')) {
+      await loadAnnotFont(v);
+      const name = ANNOT_GF_CSS_NAMES[v];
+      annotFontFamily = `"__annot_${v}",${name.includes('Serif') || name.includes('Garamond') || name.includes('Baskerville') || name.includes('Fatface') ? 'serif' : 'sans-serif'}`;
+    } else {
+      annotFontFamily = ANNOT_FONTS_SYSTEM[v] || ANNOT_FONTS_SYSTEM.system;
+    }
+    refreshAnnotations();
+  });
+  document.getElementById('cAnnotDot').addEventListener('input',    e => { annotDotColor   = e.target.value; refreshAnnotations(); });
+  document.getElementById('cAnnotNeg').addEventListener('input',    e => { annotNegColor   = e.target.value; refreshAnnotations(); });
+  document.getElementById('cAnnotPos').addEventListener('input',    e => { annotPosColor   = e.target.value; refreshAnnotations(); });
+  document.getElementById('cAnnotRisk').addEventListener('input',   e => { annotRiskColor  = e.target.value; refreshAnnotations(); });
+
+  // Panel collapse toggle
+  const panelToggle = document.getElementById('panelToggle');
+  const panel       = document.querySelector('.panel');
+  panelToggle.addEventListener('click', () => {
+    const collapsed = panel.classList.toggle('collapsed');
+    panelToggle.textContent = collapsed ? '›' : '‹';
+  });
+
+  // Force all sliders and display spans to their canonical defaults, overriding any browser-cached values
+  function forceDefaults() {
+    const set = (id, valId, val) => {
+      const el = document.getElementById(id); if (!el) return;
+      el.value = val;
+      const sp = document.getElementById(valId); if (!sp) return;
+      sp.textContent = (val % 1 === 0) ? val : parseFloat(val).toFixed(2);
+    };
+    set('pSize',           'pSizeVal',           0.8);
+    set('pCount',          'pCountVal',           4100);
+    set('pSpeed',          'pSpeedVal',           4.5);
+    set('pAmp',            'pAmpVal',             3.5);
+    set('pOpacity',        'pOpacityVal',         1.0);
+    set('mSpeed',          'mSpeedVal',           1.0);
+    set('mGravity',        'mGravityVal',         0.7);
+    set('mDrift',          'mDriftVal',           90);
+    set('mWobble',         'mWobbleVal',          22);
+    set('mMagnet',         'mMagnetVal',          0.7);
+    set('pConnectorW',     'pConnectorWVal',      1.5);
+    set('pConnectorOp',    'pConnectorOpVal',     0.22);
+    set('pFloorSpread',    'pFloorSpreadVal',     0.045);
+    set('pFloorScatter',   'pFloorScatterVal',    80);
+    set('pAnnotBgOp',      'pAnnotBgOpVal',       0.95);
+    set('pAnnotPad',       'pAnnotPadVal',        16);
+    set('pAnnotMargin',    'pAnnotMarginVal',     14);
+    set('pAnnotShadow',    'pAnnotShadowVal',     15);
+    set('pAnnotPrefixSz',  'pAnnotPrefixSzVal',   15);
+    set('pAnnotPrefixWt',  'pAnnotPrefixWtVal',   800);
+    set('pAnnotSentSz',    'pAnnotSentSzVal',     13);
+    set('pAnnotSentWt',    'pAnnotSentWtVal',     500);
+    set('pAnnotLineH',     'pAnnotLineHVal',      1.45);
+    set('pAnnotDeltaSz',   'pAnnotDeltaSzVal',    20);
+    set('pAnnotRadius',    'pAnnotRadiusVal',     12);
+  }
+
+  // Sync JS vars from DOM after forceDefaults() — ensures JS matches what's shown
+  function syncSlidersFromDOM() {
+    const r = id => parseFloat(document.getElementById(id).value);
+    dotSize          = r('pSize');
+    dotCount         = Math.round(r('pCount'));
+    dotSpeed         = r('pSpeed');
+    dotAmp           = r('pAmp');
+    dotOpacity       = r('pOpacity');
+    seqSpeed         = r('mSpeed');
+    fallGravity      = r('mGravity');
+    fallDrift        = r('mDrift');
+    fallWobble       = r('mWobble');
+    fallMagnet       = r('mMagnet');
+    connectorWeight  = r('pConnectorW');
+    connectorOpacity = r('pConnectorOp');
+    floorSpread      = r('pFloorSpread');
+    floorScatter     = r('pFloorScatter');
+    annotCardBgOp    = r('pAnnotBgOp');
+    annotCardPad     = r('pAnnotPad');
+    annotCardMargin  = r('pAnnotMargin');
+    annotShadow      = r('pAnnotShadow');
+    annotPrefixSz    = r('pAnnotPrefixSz');
+    annotPrefixWt    = r('pAnnotPrefixWt');
+    annotSentSz      = r('pAnnotSentSz');
+    annotSentWt      = r('pAnnotSentWt');
+    annotLineH       = r('pAnnotLineH');
+    annotDeltaSz     = r('pAnnotDeltaSz');
+    annotCardRadius  = r('pAnnotRadius');
+  }
+
+  document.getElementById('btnMatchDensity').addEventListener('click', function() {
+    matchDensity = !matchDensity;
+    this.classList.toggle('on', matchDensity);
+    this.textContent = matchDensity ? 'On' : 'Off';
+    rebuildFloorYOffsets();
+  });
+
+  const bgImageInput = document.getElementById('bgImageInput');
+  const bgImageBtn   = document.getElementById('bgImageBtn');
+  const bgClearBtn   = document.getElementById('bgClearBtn');
+
+  bgImageBtn.addEventListener('click', () => bgImageInput.click());
+
+  bgImageInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    document.body.style.backgroundImage = `url(${url})`;
+    document.body.style.backgroundSize  = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    bgImageBtn.textContent = file.name;
+    bgImageBtn.title = file.name;
+  });
+
+  bgClearBtn.addEventListener('click', () => {
+    document.body.style.backgroundImage = '';
+    bgImageBtn.textContent = 'Choose file…';
+    bgImageBtn.title = '';
+    bgImageInput.value = '';
+  });
+
+  // ── customization panel (FONT / SIZE / WEIGHT / IMAGE) ──
+  const customToggle   = document.getElementById('customToggle');
+  const customPanel    = document.getElementById('customPanel');
+  const custFont       = document.getElementById('custFont');
+  const custSize       = document.getElementById('custSize');
+  const custSizeVal    = document.getElementById('custSizeVal');
+  const custWeight     = document.getElementById('custWeight');
+  const custImageBtn   = document.getElementById('custImageBtn');
+  const custImageClear = document.getElementById('custImageClear');
+  const custImageInput = document.getElementById('custImageInput');
+  const DEFAULT_BG_IMAGE = "url('assets/bg-storm.webp')";
+
+  customToggle.addEventListener('click', () => {
+    customPanel.classList.toggle('hidden');
+  });
+
+  // Reflect currentWeight + lock the dropdown for single-weight families.
+  function syncCustomWeight() {
+    const locked = SINGLE_WEIGHT.has(currentFontKey);
+    custWeight.disabled = locked;
+    custWeight.value = String(locked ? 400 : currentWeight);
+  }
+
+  custFont.addEventListener('change', () => {
+    currentFontKey = custFont.value;
+    if (SINGLE_WEIGHT.has(currentFontKey)) currentWeight = 400;
+    syncCustomWeight();
+    applyFontWeight();
+  });
+
+  custWeight.addEventListener('change', () => {
+    currentWeight = parseInt(custWeight.value, 10) || 400;
+    applyFontWeight();
+  });
+
+  custSize.addEventListener('input', () => {
+    manualFontSize = parseInt(custSize.value, 10);
+    custSizeVal.textContent = manualFontSize;
+    rebuild(false);
+  });
+
+  custImageBtn.addEventListener('click', () => custImageInput.click());
+  custImageInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    document.body.style.backgroundImage    = `url(${url})`;
+    document.body.style.backgroundSize     = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat   = 'no-repeat';
+    custImageBtn.textContent = file.name;
+    custImageBtn.title = file.name;
+  });
+  custImageClear.addEventListener('click', () => {
+    document.body.style.backgroundImage = DEFAULT_BG_IMAGE;  // restore default storm
+    custImageBtn.textContent = 'Choose file…';
+    custImageBtn.title = '';
+    custImageInput.value = '';
+  });
+
+  // ── boot ──────────────────────────────────────────────
+  document.body.style.background = bgColor;            // maroon fallback underneath
+  // default background image (falls back to maroon if the asset is missing)
+  document.body.style.backgroundImage    = "url('assets/bg-storm.webp')";
+  document.body.style.backgroundSize     = 'cover';
+  document.body.style.backgroundPosition = 'center';
+  document.body.style.backgroundRepeat   = 'no-repeat';
+  try {
+    currentFont = await loadFont('inter');
+    fontMetrics = computeFontMetrics(currentFont);
+    applyWordInputFont();
+    statusEl.classList.remove('error');
+    activeAlgo = 'optical';
+    syncAlgo();
+    loadAnnotFont('af-inter'); // pre-load Inter for annotation cards
+    forceDefaults();           // override any browser-cached slider values with canonical defaults
+    syncSlidersFromDOM();      // sync JS vars to match what's now shown
+    custFont.value = currentFontKey;   // sync customization panel to boot state
+    syncCustomWeight();
+    await rebuild(false);
+    // Boot: letters start slightly tight, dots fill gap-by-gap left to right, kerning corrects as each gap fills
+    startBootSeqAnim();
+  } catch (e) {
+    statusEl.textContent = `font load failed: ${e.message || e}`;
+    statusEl.classList.add('error');
+  }
+})();
+</script>
+</body>
+</html>
