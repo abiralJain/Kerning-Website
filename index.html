@@ -492,6 +492,68 @@
   }
   #custCopy:hover { background: rgba(194,251,255,0.2); border-color: rgba(194,251,255,0.6); }
   #custCopy.copied { background: rgba(138,255,153,0.16); border-color: rgba(138,255,153,0.5); color: #8aff99; }
+
+  /* fallback "copy manually" modal (shown when the browser blocks auto-copy) */
+  #cfgOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  #cfgOverlay.hidden { display: none; }
+  #cfgModal {
+    width: min(560px, 92vw);
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(33,13,19,0.97);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  #cfgModal .cfg-head {
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+  #cfgModal textarea {
+    width: 100%;
+    flex: 1;
+    min-height: 300px;
+    resize: vertical;
+    background: rgba(0,0,0,0.35);
+    color: #e8e8e8;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    color-scheme: dark;
+  }
+  #cfgModal .cfg-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #cfgModal .cfg-btn {
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.75);
+    cursor: pointer;
+  }
+  #cfgModal .cfg-btn:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
+  #cfgModal .cfg-btn.primary { background: rgba(194,251,255,0.14); border-color: rgba(194,251,255,0.4); color: #c2fbff; }
 </style>
 </head>
 <body>
@@ -4231,36 +4293,81 @@ ${JSON.stringify(c, null, 2)}
 `);
   }
 
-  function copyToClipboard(str) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(str).catch(() => fallbackCopy(str));
-    }
-    return fallbackCopy(str);
-  }
-  function fallbackCopy(str) {
-    return new Promise(res => {
+  // Synchronous copy that works inside the click gesture — reliable even in
+  // sandboxed/embedded previews where the async Clipboard API is blocked.
+  function copySync(str) {
+    let ok = false;
+    try {
       const ta = document.createElement('textarea');
       ta.value = str;
+      ta.setAttribute('readonly', '');
       ta.style.position = 'fixed';
+      ta.style.top = '-2000px';
+      ta.style.left = '0';
       ta.style.opacity = '0';
       document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, str.length);
+      ok = document.execCommand('copy');
       document.body.removeChild(ta);
-      res();
-    });
+    } catch (e) { ok = false; }
+    // Best-effort async API too (may succeed where execCommand is disabled).
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { navigator.clipboard.writeText(str).then(() => {}, () => {}); } catch (e) {}
+    }
+    return ok;
   }
+  // Fallback modal: shows the config in a selectable box so the user can copy
+  // manually when the browser blocks programmatic clipboard access.
+  function showConfigModal(text) {
+    let overlay = document.getElementById('cfgOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'cfgOverlay';
+      overlay.className = 'hidden';
+      overlay.innerHTML =
+        '<div id="cfgModal">' +
+          '<div class="cfg-head">kern config — select all &amp; copy (⌘/Ctrl + C)</div>' +
+          '<textarea id="cfgText" readonly spellcheck="false"></textarea>' +
+          '<div class="cfg-actions">' +
+            '<button class="cfg-btn" id="cfgClose">Close</button>' +
+            '<button class="cfg-btn primary" id="cfgCopyAgain">Copy</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+      overlay.querySelector('#cfgClose').addEventListener('click', () => overlay.classList.add('hidden'));
+      overlay.querySelector('#cfgCopyAgain').addEventListener('click', () => {
+        const t = overlay.querySelector('#cfgText');
+        t.focus(); t.select();
+        const ok = copySync(t.value);
+        overlay.querySelector('#cfgCopyAgain').textContent = ok ? 'Copied ✓' : 'Copy';
+      });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.add('hidden'); });
+    }
+    const ta = overlay.querySelector('#cfgText');
+    ta.value = text;
+    overlay.classList.remove('hidden');
+    ta.focus();
+    ta.select();
+  }
+
   const custCopyBtn = document.getElementById('custCopy');
   custCopyBtn.addEventListener('click', () => {
-    // Always give the user feedback, even if the clipboard API is blocked.
-    copyToClipboard(buildKernConfigText()).finally(() => {
+    const text = buildKernConfigText();
+    const ok = copySync(text);
+    if (ok) {
       custCopyBtn.textContent = 'Copied ✓';
       custCopyBtn.classList.add('copied');
       setTimeout(() => {
         custCopyBtn.textContent = 'Copy config';
         custCopyBtn.classList.remove('copied');
       }, 1800);
-    });
+    } else {
+      // Clipboard blocked (e.g. sandboxed preview) — show the manual-copy box.
+      showConfigModal(text);
+    }
   });
 
   // ── boot ──────────────────────────────────────────────
