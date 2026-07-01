@@ -4231,13 +4231,37 @@ ${JSON.stringify(c, null, 2)}
 `);
   }
 
-  document.getElementById('custCopy').addEventListener('click', function () {
-    navigator.clipboard.writeText(buildKernConfigText()).then(() => {
-      this.textContent = 'Copied ✓';
-      this.classList.add('copied');
-      setTimeout(() => { this.textContent = 'Copy config'; this.classList.remove('copied'); }, 1800);
+  function copyToClipboard(str) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(str).catch(() => fallbackCopy(str));
+    }
+    return fallbackCopy(str);
+  }
+  function fallbackCopy(str) {
+    return new Promise(res => {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+      document.body.removeChild(ta);
+      res();
     });
-  }.bind(document.getElementById('custCopy')));
+  }
+  const custCopyBtn = document.getElementById('custCopy');
+  custCopyBtn.addEventListener('click', () => {
+    // Always give the user feedback, even if the clipboard API is blocked.
+    copyToClipboard(buildKernConfigText()).finally(() => {
+      custCopyBtn.textContent = 'Copied ✓';
+      custCopyBtn.classList.add('copied');
+      setTimeout(() => {
+        custCopyBtn.textContent = 'Copy config';
+        custCopyBtn.classList.remove('copied');
+      }, 1800);
+    });
+  });
 
   // ── boot ──────────────────────────────────────────────
   document.body.style.background = bgColor;            // maroon fallback underneath
