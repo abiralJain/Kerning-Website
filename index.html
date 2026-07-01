@@ -419,11 +419,16 @@
   .cust-row select,
   .cust-row input[type="range"] { flex: 1; min-width: 0; }
   #custFont, #custWeight {
-    background: rgba(255,255,255,0.04);
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: rgba(255,255,255,0.04);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23ffffff' stroke-opacity='0.5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
     color: #ececec;
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 7px;
-    padding: 7px 10px;
+    padding: 7px 30px 7px 10px;
     font-size: 13px;
     font-family: 'Space Mono', ui-monospace, monospace;
     cursor: pointer;
@@ -462,6 +467,7 @@
   }
   #custImageBtn:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
   #custImageClear {
+    display: none;                 /* shown only after an image is uploaded */
     background: none;
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 7px;
@@ -4169,7 +4175,6 @@
   const custImageBtn   = document.getElementById('custImageBtn');
   const custImageClear = document.getElementById('custImageClear');
   const custImageInput = document.getElementById('custImageInput');
-  const DEFAULT_BG_IMAGE = "url('assets/bg-storm.webp')";
 
   customToggle.addEventListener('click', () => {
     customPanel.classList.toggle('hidden');
@@ -4211,12 +4216,14 @@
     document.body.style.backgroundRepeat   = 'no-repeat';
     custImageBtn.textContent = file.name;
     custImageBtn.title = file.name;
+    custImageClear.style.display = 'block';   // reveal clear only when an image is set
   });
   custImageClear.addEventListener('click', () => {
-    document.body.style.backgroundImage = DEFAULT_BG_IMAGE;  // restore default storm
+    document.body.style.backgroundImage = 'none';  // back to default #3e1824
     custImageBtn.textContent = 'Choose file…';
     custImageBtn.title = '';
     custImageInput.value = '';
+    custImageClear.style.display = 'none';         // hide clear again
   });
 
   // Snapshot of the current type + computed optical-kerning as a reusable config.
@@ -4371,12 +4378,7 @@ ${JSON.stringify(c, null, 2)}
   });
 
   // ── boot ──────────────────────────────────────────────
-  document.body.style.background = bgColor;            // maroon fallback underneath
-  // default background image (falls back to maroon if the asset is missing)
-  document.body.style.backgroundImage    = "url('assets/bg-storm.webp')";
-  document.body.style.backgroundSize     = 'cover';
-  document.body.style.backgroundPosition = 'center';
-  document.body.style.backgroundRepeat   = 'no-repeat';
+  document.body.style.background = bgColor;            // default background: #3e1824 (no image)
   try {
     currentFont = await loadFont('inter');
     fontMetrics = computeFontMetrics(currentFont);
