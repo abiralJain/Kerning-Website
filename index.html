@@ -13,7 +13,7 @@
   body {
     display: flex;
     flex-direction: row;
-    background: #3e1824;
+    background: #0F172A;
     color: #1a1a1a;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
   }
@@ -365,7 +365,7 @@
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: rgba(33,13,19,0.72);
+    background: rgba(15,23,42,0.72);
     border: 1px solid rgba(255,255,255,0.14);
     color: rgba(255,255,255,0.7);
     font-family: 'Space Mono', ui-monospace, monospace;
@@ -375,7 +375,7 @@
     -webkit-backdrop-filter: blur(12px);
     transition: color 0.15s, border-color 0.15s, background 0.15s;
   }
-  #customToggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(33,13,19,0.9); }
+  #customToggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(15,23,42,0.9); }
 
   #customPanel {
     position: fixed;
@@ -385,7 +385,7 @@
     width: 290px;
     padding: 18px 18px 16px;
     border-radius: 14px;
-    background: rgba(33,13,19,0.82);
+    background: rgba(15,23,42,0.82);
     border: 1px solid rgba(255,255,255,0.12);
     box-shadow: 0 18px 50px rgba(0,0,0,0.45);
     backdrop-filter: blur(18px);
@@ -437,7 +437,7 @@
   #custFont:focus, #custWeight:focus { outline: none; border-color: rgba(255,255,255,0.4); }
   #custWeight:disabled { opacity: 0.4; cursor: not-allowed; }
   #custSize {
-    accent-color: #c2fbff;
+    accent-color: #E8EEF7;
     cursor: pointer;
     height: 16px;
     background: transparent;
@@ -484,20 +484,20 @@
   .cust-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 2px 0; }
   #custCopy {
     width: 100%;
-    background: rgba(194,251,255,0.12);
-    border: 1px solid rgba(194,251,255,0.35);
+    background: rgba(232,238,247,0.1);
+    border: 1px solid rgba(232,238,247,0.3);
     border-radius: 8px;
     padding: 9px 10px;
     font-size: 12px;
     letter-spacing: 1px;
     text-transform: uppercase;
     font-family: 'Space Mono', ui-monospace, monospace;
-    color: #c2fbff;
+    color: #E8EEF7;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
-  #custCopy:hover { background: rgba(194,251,255,0.2); border-color: rgba(194,251,255,0.6); }
-  #custCopy.copied { background: rgba(138,255,153,0.16); border-color: rgba(138,255,153,0.5); color: #8aff99; }
+  #custCopy:hover { background: rgba(232,238,247,0.18); border-color: rgba(232,238,247,0.5); }
+  #custCopy.copied { background: rgba(86,217,160,0.16); border-color: rgba(86,217,160,0.5); color: #56D9A0; }
 
   /* fallback "copy manually" modal (shown when the browser blocks auto-copy) */
   #cfgOverlay {
@@ -518,7 +518,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: rgba(33,13,19,0.97);
+    background: rgba(15,23,42,0.97);
     border: 1px solid rgba(255,255,255,0.14);
     border-radius: 14px;
     padding: 18px;
@@ -559,7 +559,7 @@
     cursor: pointer;
   }
   #cfgModal .cfg-btn:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
-  #cfgModal .cfg-btn.primary { background: rgba(194,251,255,0.14); border-color: rgba(194,251,255,0.4); color: #c2fbff; }
+  #cfgModal .cfg-btn.primary { background: rgba(232,238,247,0.14); border-color: rgba(232,238,247,0.4); color: #E8EEF7; }
 </style>
 </head>
 <body>
@@ -658,23 +658,23 @@
     </div>
     <div class="color-row">
       <span class="param-name">Shrinks</span>
-      <input id="cAnnotNeg" type="color" value="#ff70fa" />
+      <input id="cAnnotNeg" type="color" value="#a78bfa" />
     </div>
     <div class="color-row">
       <span class="param-name">Inflates</span>
-      <input id="cAnnotPos" type="color" value="#8aff99" />
+      <input id="cAnnotPos" type="color" value="#56d9a0" />
     </div>
     <div class="color-row">
       <span class="param-name">Risk</span>
-      <input id="cAnnotRisk" type="color" value="#ff884d" />
+      <input id="cAnnotRisk" type="color" value="#fb923c" />
     </div>
     <div class="color-row">
       <span class="param-name">Card dots</span>
-      <input id="cAnnotDot" type="color" value="#9a6071" />
+      <input id="cAnnotDot" type="color" value="#475569" />
     </div>
     <div class="color-row">
       <span class="param-name">Cursor</span>
-      <input id="cCursor" type="color" value="#c2fbff" />
+      <input id="cCursor" type="color" value="#e8eef7" />
     </div>
   </div>
 
@@ -736,23 +736,23 @@
     </div>
     <div class="color-row">
       <span class="param-name">BG</span>
-      <input id="cBg" type="color" value="#3e1824" />
+      <input id="cBg" type="color" value="#0f172a" />
     </div>
     <div class="color-row">
       <span class="param-name">Type</span>
-      <input id="cType" type="color" value="#c2fbff" />
+      <input id="cType" type="color" value="#e8eef7" />
     </div>
     <div class="color-row">
       <span class="param-name">Dots</span>
-      <input id="cDots" type="color" value="#8d7c81" />
+      <input id="cDots" type="color" value="#64748b" />
     </div>
     <div class="color-row">
       <span class="param-name">Labels</span>
-      <input id="cLabels" type="color" value="#c2fbff" />
+      <input id="cLabels" type="color" value="#e8eef7" />
     </div>
     <div class="color-row">
       <span class="param-name">Lines</span>
-      <input id="cConnector" type="color" value="#c2fbff" />
+      <input id="cConnector" type="color" value="#e8eef7" />
     </div>
     <div class="param-row">
       <span class="param-name">Line wt.</span>
@@ -865,7 +865,7 @@
     </div>
     <div class="color-row">
       <span class="param-name">Card BG</span>
-      <input id="cAnnotBg" type="color" value="#210d13" />
+      <input id="cAnnotBg" type="color" value="#1b2437" />
     </div>
     <div class="param-row">
       <span class="param-name">BG opacity</span>
@@ -927,7 +927,7 @@
     </div>
     <div class="color-row">
       <span class="param-name">Prefix color</span>
-      <input id="cAnnotTitle" type="color" value="#e8e8e8" />
+      <input id="cAnnotTitle" type="color" value="#e8eef7" />
     </div>
     <div class="param-row">
       <span class="param-name">Prefix size</span>
@@ -941,7 +941,7 @@
     </div>
     <div class="color-row">
       <span class="param-name">Sentence color</span>
-      <input id="cAnnotSent" type="color" value="#e8e8e8" />
+      <input id="cAnnotSent" type="color" value="#cbd5e1" />
     </div>
     <div class="param-row">
       <span class="param-name">Sentence size</span>
@@ -1000,11 +1000,11 @@
   const FLATTEN_STEPS = 20;
   const Y_STEP        = 1;
   const MIN_CLEARANCE = 2;
-  let dotColor        = '#8d7c81';
-  let typeColor       = '#c2fbff';
-  let bgColor         = '#3e1824';
-  let labelColor      = '#c2fbff';
-  let connectorColor   = '#c2fbff';   // color for gap→label/floor connector lines
+  let dotColor        = '#64748B';
+  let typeColor       = '#E8EEF7';
+  let bgColor         = '#0F172A';
+  let labelColor      = '#E8EEF7';
+  let connectorColor   = '#E8EEF7';   // color for gap→label/floor connector lines
   let connectorWeight  = 1.5;         // px (0 = hidden)
   let connectorOpacity = 0.22;        // max opacity of connector line
   let floorSpread      = 0.045;       // horizontal spread multiplier for floor dot cluster
@@ -1106,27 +1106,27 @@
   let pendingTransTimers = []; // setTimeout IDs from transitionAlgo — cleared on rebuild
   let transitionBusy    = false; // true while pink/green dot animation is running — blocks hover
   // annotation card style
-  let annotNegColor   = '#ff70fa';
-  let annotPosColor   = '#8aff99';
-  let annotRiskColor  = '#ff884d';
-  let annotDotColor   = '#9a6071';
+  let annotNegColor   = '#A78BFA';
+  let annotPosColor   = '#56D9A0';
+  let annotRiskColor  = '#FB923C';
+  let annotDotColor   = '#475569';
   let annotDeltaSz    = 20;
-  let annotCardBgHex  = '#210d13';
+  let annotCardBgHex  = '#1B2437';
   let annotCardBgOp   = 0.95;
-  let annotBorderHex  = '#333333';
+  let annotBorderHex  = '#334155';
   let annotCardPad    = 16;
   let annotCardMargin = 14;
   let annotShadow     = 15;
   let annotFontFamily = '"__annot_af-inter", Inter, sans-serif';
   let annotPrefixSz   = 15;
   let annotPrefixWt   = 800;
-  let annotSentHex    = '#e8e8e8';
+  let annotSentHex    = '#CBD5E1';
   let annotSentSz     = 13;
   let annotSentWt     = 500;
   let annotLineH      = 1.45;
   let annotCardRadius = 12;
   // legacy alias so any remaining references don't break
-  let annotTitleHex   = '#e8e8e8';
+  let annotTitleHex   = '#E8EEF7';
   let annotTitleSz    = 13;
 
   let canvasEditMode = false;
@@ -2620,7 +2620,7 @@
       // Gradient: transparent at the gap (word interior) → 10% connectorColor at the external end.
       if (connectorWeight > 0) {
         const tcM = connectorColor.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-        const [tr, tg, tb] = tcM ? [parseInt(tcM[1],16), parseInt(tcM[2],16), parseInt(tcM[3],16)] : [194,251,255];
+        const [tr, tg, tb] = tcM ? [parseInt(tcM[1],16), parseInt(tcM[2],16), parseInt(tcM[3],16)] : [232,238,247];
         const maxA = connectorOpacity * labelOpacity * labelDim;
         const transparent = `rgba(${tr},${tg},${tb},0)`;
         const tinted      = `rgba(${tr},${tg},${tb},${maxA.toFixed(3)})`;
@@ -4219,7 +4219,7 @@
     custImageClear.style.display = 'block';   // reveal clear only when an image is set
   });
   custImageClear.addEventListener('click', () => {
-    document.body.style.backgroundImage = 'none';  // back to default #3e1824
+    document.body.style.backgroundImage = 'none';  // back to default #0F172A
     custImageBtn.textContent = 'Choose file…';
     custImageBtn.title = '';
     custImageInput.value = '';
@@ -4378,7 +4378,7 @@ ${JSON.stringify(c, null, 2)}
   });
 
   // ── boot ──────────────────────────────────────────────
-  document.body.style.background = bgColor;            // default background: #3e1824 (no image)
+  document.body.style.background = bgColor;            // default background: #0F172A (no image)
   try {
     currentFont = await loadFont('inter');
     fontMetrics = computeFontMetrics(currentFont);
