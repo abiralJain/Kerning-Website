@@ -475,6 +475,23 @@
   }
   #custImageClear:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
   #custImageInput { display: none; }
+  .cust-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 2px 0; }
+  #custCopy {
+    width: 100%;
+    background: rgba(194,251,255,0.12);
+    border: 1px solid rgba(194,251,255,0.35);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color: #c2fbff;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #custCopy:hover { background: rgba(194,251,255,0.2); border-color: rgba(194,251,255,0.6); }
+  #custCopy.copied { background: rgba(138,255,153,0.16); border-color: rgba(138,255,153,0.5); color: #8aff99; }
 </style>
 </head>
 <body>
@@ -560,6 +577,8 @@
     <button id="custImageClear" title="Reset background">✕</button>
     <input type="file" id="custImageInput" accept="image/*" />
   </div>
+  <div class="cust-divider"></div>
+  <button id="custCopy" title="Copy the current type + kerning config to clipboard">Copy config</button>
 </div>
 
 <button id="panelToggle" class="panel-toggle" title="Toggle panel">‹</button>
@@ -4137,6 +4156,88 @@
     custImageBtn.title = '';
     custImageInput.value = '';
   });
+
+  // Snapshot of the current type + computed optical-kerning as a reusable config.
+  function buildKernConfig() {
+    const chars = Array.from(wordInput.value);
+    const upm   = currentFont ? currentFont.unitsPerEm : 1000;
+    const size  = Math.round(FONT_SIZE);
+    const opt   = algoPositions.optical || [];
+    const def   = algoPositions.default || [];
+    // per-pair kern = optical gap minus the font's default (metric) gap
+    const pairs = [];
+    for (let i = 0; i < chars.length - 1; i++) {
+      if (opt[i] == null || opt[i+1] == null || def[i] == null || def[i+1] == null) continue;
+      const kernPx = (opt[i+1] - opt[i]) - (def[i+1] - def[i]);  // negative = tighter
+      pairs.push({
+        pair: chars[i] + chars[i+1],
+        em:        +(kernPx / FONT_SIZE).toFixed(4),
+        px:        +kernPx.toFixed(2),
+        figmaPct:  +(kernPx / FONT_SIZE * 100).toFixed(2),   // Figma letter-spacing %
+        units:     Math.round(kernPx * upm / FONT_SIZE)      // font design units
+      });
+    }
+    const fontLabel = custFont.options[custFont.selectedIndex]
+      ? custFont.options[custFont.selectedIndex].text : currentFontKey;
+    return {
+      word: wordInput.value,
+      font: fontLabel, fontKey: currentFontKey, weight: currentWeight,
+      sizePx: size, autoSize: manualFontSize == null,
+      colors: { type: typeColor, background: bgColor },
+      trackingPx: tracking, trackingEm: +(tracking / FONT_SIZE).toFixed(4),
+      algorithm: activeAlgo === 'optical' ? 'optical-kerning' : 'off',
+      unitsPerEm: upm,
+      opticalKerningPairs: pairs
+    };
+  }
+
+  function buildKernConfigText() {
+    const c = buildKernConfig();
+    const sign = n => (n >= 0 ? '+' : '') + n;
+    const css =
+`.kerned {
+  font-family: "${c.font}", sans-serif;
+  font-weight: ${c.weight};
+  font-size: ${c.sizePx}px;
+  color: ${c.colors.type};
+  background: ${c.colors.background};
+  letter-spacing: ${c.trackingEm}em;
+}`;
+    const pairLines = c.opticalKerningPairs.map(p =>
+      `  "${p.pair}"   ${sign(p.em)}em   ${sign(p.px)}px   ${sign(p.figmaPct)}%   ${sign(p.units)} units`
+    ).join('\n');
+    return (
+`/* ===== kern.me config ===== */
+Word:       ${c.word}
+Font:       ${c.font}  (weight ${c.weight})
+Size:       ${c.sizePx}px${c.autoSize ? '  (auto-fit)' : ''}
+Type color: ${c.colors.type}
+Background: ${c.colors.background}
+Tracking:   ${c.trackingPx}px  (${c.trackingEm}em)
+Algorithm:  ${c.algorithm}
+Units/em:   ${c.unitsPerEm}
+
+/* ----- CSS ----- */
+${css}
+
+/* ----- Optical kerning, per adjacent pair -----
+   negative = tighter. em/px/% are size-relative; "units" are font design units.
+   Figma: select the two letters, set Letter spacing to the % value.
+   CSS/canvas: apply em between the glyphs (letter-spacing can't vary per pair). */
+${pairLines || '  (none)'}
+
+/* ----- JSON ----- */
+${JSON.stringify(c, null, 2)}
+`);
+  }
+
+  document.getElementById('custCopy').addEventListener('click', function () {
+    navigator.clipboard.writeText(buildKernConfigText()).then(() => {
+      this.textContent = 'Copied ✓';
+      this.classList.add('copied');
+      setTimeout(() => { this.textContent = 'Copy config'; this.classList.remove('copied'); }, 1800);
+    });
+  }.bind(document.getElementById('custCopy')));
 
   // ── boot ──────────────────────────────────────────────
   document.body.style.background = bgColor;            // maroon fallback underneath
