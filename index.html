@@ -499,6 +499,80 @@
   }
   #custCopy:hover { background: rgba(232,238,247,0.18); border-color: rgba(232,238,247,0.5); }
   #custCopy.copied { background: rgba(86,217,160,0.16); border-color: rgba(86,217,160,0.5); color: #56D9A0; }
+  #custHeadline {
+    flex: 1;
+    min-width: 0;
+    background: rgba(255,255,255,0.04);
+    color: #ececec;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  #custHeadline:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .cust-copy-row { display: flex; gap: 8px; }
+  .cust-copy-row #custCopy { flex: 1; }
+  #custHelp {
+    flex: none;
+    width: 40px;
+    background: rgba(232,238,247,0.06);
+    border: 1px solid rgba(232,238,247,0.3);
+    border-radius: 8px;
+    color: #E8EEF7;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #custHelp:hover { background: rgba(232,238,247,0.16); border-color: rgba(232,238,247,0.5); }
+
+  #helpOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  #helpOverlay.hidden { display: none; }
+  #helpModal {
+    width: min(540px, 92vw);
+    max-height: 84vh;
+    overflow-y: auto;
+    background: rgba(15,23,42,0.98);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 22px 24px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    color: #E8EEF7;
+    font-family: 'Space Mono', ui-monospace, monospace;
+  }
+  #helpModal h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  #helpModal .help-sub { font-size: 12px; color: #94A3B8; margin-bottom: 16px; }
+  #helpModal .help-sec { margin-top: 16px; }
+  #helpModal .help-sec h4 { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #56D9A0; margin-bottom: 6px; }
+  #helpModal .help-sec p { font-size: 12.5px; line-height: 1.65; color: #CBD5E1; margin: 0; }
+  #helpModal code { background: rgba(255,255,255,0.09); padding: 1px 5px; border-radius: 4px; color: #E8EEF7; font-size: 12px; }
+  #helpModal .help-close {
+    margin-top: 20px;
+    width: 100%;
+    background: rgba(232,238,247,0.1);
+    border: 1px solid rgba(232,238,247,0.3);
+    border-radius: 8px;
+    padding: 9px;
+    color: #E8EEF7;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  #helpModal .help-close:hover { background: rgba(232,238,247,0.18); }
 
   /* fallback "copy manually" modal (shown when the browser blocks auto-copy) */
   #cfgOverlay {
@@ -580,7 +654,6 @@
     </svg>
   </div>
   <canvas id="annotCanvas"></canvas>
-  <div id="credit">Made by <a href="https://abiraljain.com/" target="_blank" rel="noopener">Abiral Jain</a></div>
   <div class="algo-tab">
     <div class="algo-tab-indicator shifted"></div>
     <button class="algo-btn" data-algo="default">Off</button>
@@ -590,6 +663,10 @@
 
 <button id="customToggle" title="Customize">Aa</button>
 <div id="customPanel" class="hidden">
+  <div class="cust-row">
+    <span class="cust-label">Headline</span>
+    <input id="custHeadline" type="text" maxlength="22" spellcheck="false" autocomplete="off" value="Headline" />
+  </div>
   <div class="cust-row">
     <span class="cust-label">Font</span>
     <select id="custFont">
@@ -625,7 +702,7 @@
   </div>
   <div class="cust-row">
     <span class="cust-label">Size</span>
-    <input id="custSize" type="range" min="60" max="500" step="1" value="200" />
+    <input id="custSize" type="range" min="24" max="400" step="1" value="200" />
     <span class="cust-val" id="custSizeVal">Auto</span>
   </div>
   <div class="cust-row">
@@ -647,7 +724,10 @@
     <input type="file" id="custImageInput" accept="image/*" />
   </div>
   <div class="cust-divider"></div>
-  <button id="custCopy" title="Copy the current type + kerning config to clipboard">Copy config</button>
+  <div class="cust-copy-row">
+    <button id="custCopy" title="Copy the current type + kerning config to clipboard">Copy config</button>
+    <button id="custHelp" title="How to use this config" aria-label="How to use this config">?</button>
+  </div>
 </div>
 
 <button id="panelToggle" class="panel-toggle" title="Toggle panel">‹</button>
@@ -683,7 +763,7 @@
 
   <div>
     <div class="panel-label">Word</div>
-    <input id="word" type="text" value="Kerning" maxlength="22" spellcheck="false" autocomplete="off" />
+    <input id="word" type="text" value="Headline" maxlength="22" spellcheck="false" autocomplete="off" />
   </div>
 
   <div>
@@ -4181,6 +4261,13 @@
     customPanel.classList.toggle('hidden');
   });
 
+  // Headline field drives the displayed word (via the existing #word input + rebuild).
+  const custHeadline = document.getElementById('custHeadline');
+  custHeadline.addEventListener('input', () => {
+    wordInput.value = custHeadline.value;
+    rebuild(false);
+  });
+
   // Reflect currentWeight + lock the dropdown for single-weight families.
   function syncCustomWeight() {
     const locked = SINGLE_WEIGHT.has(currentFontKey);
@@ -4277,7 +4364,7 @@
       `  "${p.pair}"   ${sign(p.em)}em   ${sign(p.px)}px   ${sign(p.figmaPct)}%   ${sign(p.units)} units`
     ).join('\n');
     return (
-`/* ===== kern.me config ===== */
+`/* ===== kerning.config ===== */
 Word:       ${c.word}
 Font:       ${c.font}  (weight ${c.weight})
 Size:       ${c.sizePx}px${c.autoSize ? '  (auto-fit)' : ''}
@@ -4377,6 +4464,32 @@ ${JSON.stringify(c, null, 2)}
       showConfigModal(text);
     }
   });
+
+  // Help popup: how to reuse the copied config in Figma / CSS / code.
+  function showHelpModal() {
+    let overlay = document.getElementById('helpOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'helpOverlay';
+      overlay.className = 'hidden';
+      overlay.innerHTML =
+        '<div id="helpModal">' +
+          '<h3>Using this config</h3>' +
+          '<div class="help-sub">Copy config gives you the exact optical kerning for the current word, font, weight and size. The per-pair values are size-independent, so they reproduce the same spacing anywhere.</div>' +
+          '<div class="help-sec"><h4>Figma</h4><p>Set the layer to the same font, weight and size. To match the optical spacing, select the two letters of a pair and set Letter spacing to that pair’s <code>%</code> value (Figma’s letter-spacing % is relative to font size, which is what the config reports).</p></div>' +
+          '<div class="help-sec"><h4>CSS / web</h4><p>Use the CSS block for font, weight, size and color. A single <code>letter-spacing</code> can’t vary per pair, so for true optical spacing wrap each pair (or letter) and apply the <code>em</code> value between the glyphs — <code>em</code> holds at any font size.</p></div>' +
+          '<div class="help-sec"><h4>Code / tokens</h4><p>Parse the <code>JSON</code> block. <code>opticalKerningPairs</code> lists every adjacent pair with <code>em</code>, <code>px</code>, <code>figmaPct</code> and font <code>units</code> — feed whichever your renderer needs (canvas/SVG glyph placement, a design token, etc.).</p></div>' +
+          '<div class="help-sec"><h4>What "portable" means</h4><p>Same font + weight + the per-pair <code>em</code>/<code>%</code> values = the same optical kerning on any site or tool. Size and color are cosmetic; the spacing is what carries over.</p></div>' +
+          '<button class="help-close">Got it</button>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+      overlay.querySelector('.help-close').addEventListener('click', () => overlay.classList.add('hidden'));
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.add('hidden'); });
+    }
+    overlay.classList.remove('hidden');
+  }
+  document.getElementById('custHelp').addEventListener('click', showHelpModal);
 
   // ── boot ──────────────────────────────────────────────
   document.body.style.background = bgColor;            // default background: #0F172A (no image)
