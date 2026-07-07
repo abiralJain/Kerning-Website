@@ -481,7 +481,23 @@
     line-height: 1;
   }
   #custImageClear:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
-  #custImageInput { display: none; }
+  #custImageInput, #custFontInput { display: none; }
+  .cust-export { display: flex; gap: 6px; flex: 1; min-width: 0; }
+  .cust-export button {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px;
+    padding: 7px 0;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    font-family: 'Space Mono', ui-monospace, monospace;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .cust-export button:hover { border-color: rgba(255,255,255,0.4); color: #fff; }
+  .cust-export button.copied { border-color: rgba(86,217,160,0.5); color: #56D9A0; }
   .cust-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 2px 0; }
   #custCopy {
     width: 100%;
@@ -499,19 +515,6 @@
   }
   #custCopy:hover { background: rgba(232,238,247,0.18); border-color: rgba(232,238,247,0.5); }
   #custCopy.copied { background: rgba(86,217,160,0.16); border-color: rgba(86,217,160,0.5); color: #56D9A0; }
-  #custHeadline {
-    flex: 1;
-    min-width: 0;
-    background: rgba(255,255,255,0.04);
-    color: #ececec;
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 7px;
-    padding: 7px 10px;
-    font-size: 13px;
-    font-family: 'Space Mono', ui-monospace, monospace;
-    color-scheme: dark;
-  }
-  #custHeadline:focus { outline: none; border-color: rgba(255,255,255,0.4); }
   .cust-copy-row { display: flex; gap: 8px; }
   .cust-copy-row #custCopy { flex: 1; }
   #custHelp {
@@ -664,10 +667,6 @@
 <button id="customToggle" title="Customize">Aa</button>
 <div id="customPanel" class="hidden">
   <div class="cust-row">
-    <span class="cust-label">Headline</span>
-    <input id="custHeadline" type="text" maxlength="22" spellcheck="false" autocomplete="off" value="Headline" />
-  </div>
-  <div class="cust-row">
     <span class="cust-label">Font</span>
     <select id="custFont">
       <optgroup label="Sans-Serif">
@@ -698,7 +697,11 @@
         <option value="righteous">Righteous</option>
         <option value="pacifico">Pacifico</option>
       </optgroup>
+      <optgroup label="Custom">
+        <option value="__upload">Upload font…</option>
+      </optgroup>
     </select>
+    <input type="file" id="custFontInput" accept=".ttf,.otf,.woff" />
   </div>
   <div class="cust-row">
     <span class="cust-label">Size</span>
@@ -727,6 +730,14 @@
     <button id="custImageBtn">Choose file…</button>
     <button id="custImageClear" title="Reset background">✕</button>
     <input type="file" id="custImageInput" accept="image/*" />
+  </div>
+  <div class="cust-row">
+    <span class="cust-label">Export</span>
+    <div class="cust-export">
+      <button id="expSvg" title="Download kerned word as SVG (vector, for Figma/Illustrator)">SVG</button>
+      <button id="expPng" title="Download kerned word as PNG (2×)">PNG</button>
+      <button id="expCss" title="Copy ready-to-paste HTML + CSS that reproduces this kerning">CSS</button>
+    </div>
   </div>
   <div class="cust-divider"></div>
   <div class="cust-copy-row">
@@ -4277,26 +4288,125 @@
     customPanel.classList.toggle('hidden');
   });
 
-  // Headline field drives the displayed word (via the existing #word input + rebuild).
-  const custHeadline = document.getElementById('custHeadline');
-  custHeadline.addEventListener('input', () => {
-    wordInput.value = custHeadline.value;
-    rebuild(false);
-  });
-
-  // Reflect currentWeight + lock the dropdown for single-weight families.
+  // Reflect currentWeight + lock the dropdown for single-weight families / uploaded fonts.
   function syncCustomWeight() {
-    const locked = SINGLE_WEIGHT.has(currentFontKey);
+    const locked = SINGLE_WEIGHT.has(currentFontKey) || currentFontKey === '__uploaded';
     custWeight.disabled = locked;
     custWeight.value = String(locked ? 400 : currentWeight);
   }
 
+  const custFontInput = document.getElementById('custFontInput');
   custFont.addEventListener('change', () => {
+    if (custFont.value === '__upload') {          // "Upload font…" — open picker, keep prior selection
+      custFontInput.click();
+      custFont.value = (currentFontKey === '__uploaded' || FONTS[currentFontKey]) ? currentFontKey : 'inter';
+      return;
+    }
     currentFontKey = custFont.value;
     if (SINGLE_WEIGHT.has(currentFontKey)) currentWeight = 400;
     syncCustomWeight();
     applyFontWeight();
   });
+
+  // Bring your own font: parse an uploaded .ttf/.otf/.woff and kern it directly.
+  custFontInput.addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    statusEl.textContent = 'loading font…'; statusEl.classList.remove('error');
+    try {
+      const buf = await file.arrayBuffer();
+      const font = opentype.parse(buf);
+      try { const face = new FontFace('__kern_upload', buf); await face.load(); document.fonts.add(face); } catch (err) { /* measureText falls back */ }
+      fontCache['__uploaded'] = font;
+      currentFont = font; currentFontKey = '__uploaded'; currentWeight = 400; cssFontKey = 'upload';
+      fontMetrics = computeFontMetrics(font);
+      applyWordInputFont();
+      const grp = custFont.querySelector('optgroup[label="Custom"]');
+      let opt = custFont.querySelector('option[value="__uploaded"]');
+      if (!opt) { opt = document.createElement('option'); opt.value = '__uploaded'; grp.insertBefore(opt, grp.querySelector('option[value="__upload"]')); }
+      const nm = (font.names && font.names.fullName && (font.names.fullName.en || Object.values(font.names.fullName)[0])) || file.name.replace(/\.(ttf|otf|woff)$/i, '');
+      opt.textContent = nm; custFont.value = '__uploaded';
+      syncCustomWeight();
+      await rebuild(false);
+      statusEl.classList.remove('error');
+    } catch (err) {
+      statusEl.textContent = 'could not read that font file'; statusEl.classList.add('error');
+    }
+    custFontInput.value = '';
+  });
+
+  // ── export: SVG (vector) / PNG (2×) / CSS (ready-to-paste spans) ──
+  function exportName() {
+    return ((wordInput.value || 'kerning').trim().replace(/\s+/g, '-') + '-kerned').toLowerCase();
+  }
+  function download(filename, blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function buildExportSVG() {
+    const b = lettersLayer.getBBox();
+    const pad = Math.max(8, b.height * 0.06);
+    const x = b.x - pad, y = b.y - pad, w = b.width + pad * 2, h = b.height + pad * 2;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" width="${Math.round(w)}" height="${Math.round(h)}">${lettersLayer.innerHTML}</svg>`;
+  }
+  function flashExport(btn) {
+    const orig = btn.textContent; btn.textContent = '✓'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1400);
+  }
+  document.getElementById('expSvg').addEventListener('click', function () {
+    download(exportName() + '.svg', new Blob([buildExportSVG()], { type: 'image/svg+xml' }));
+    flashExport(this);
+  });
+  document.getElementById('expPng').addEventListener('click', function () {
+    const btn = this;
+    const svg = buildExportSVG();
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2, cw = img.width * scale, ch = img.height * scale;
+      const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+      const c = cv.getContext('2d'); c.scale(scale, scale); c.drawImage(img, 0, 0);
+      cv.toBlob(bl => { download(exportName() + '.png', bl); URL.revokeObjectURL(url); flashExport(btn); }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); statusEl.textContent = 'PNG export failed'; statusEl.classList.add('error'); };
+    img.src = url;
+  });
+  function buildExportCSS() {
+    const c = buildKernConfig();
+    const pos = algoPositions[activeAlgo] || algoPositions.optical || [];
+    const chars = Array.from(wordInput.value);
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let spans = '';
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i] === ' ' ? '&#160;' : esc(chars[i]);
+      if (i === 0) { spans += `<span>${ch}</span>`; continue; }
+      const adv = letterData[i - 1] ? letterData[i - 1].advance : 0;
+      const m = (pos[i] - pos[i - 1] - adv) / FONT_SIZE;
+      spans += `<span style="margin-left:${m.toFixed(4)}em">${ch}</span>`;
+    }
+    return `<style>
+.kerned{
+  font-family:"${c.font}",sans-serif;
+  font-weight:${c.weight};
+  font-size:${c.sizePx}px;
+  line-height:1;
+  color:${c.colors.type};
+  white-space:nowrap;
+}
+.kerned span{display:inline-block;}
+</style>
+<div class="kerned">${spans}</div>`;
+  }
+  document.getElementById('expCss').addEventListener('click', function () {
+    const css = buildExportCSS();
+    const ok = copySync(css);
+    if (ok) flashExport(this); else showConfigModal(css);
+  });
+
+  // ── boot ──────────────────────────────────────────────
 
   custWeight.addEventListener('change', () => {
     currentWeight = parseInt(custWeight.value, 10) || 400;
