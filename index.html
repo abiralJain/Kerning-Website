@@ -437,7 +437,7 @@
   }
   #custFont:focus, #custWeight:focus { outline: none; border-color: rgba(255,255,255,0.4); }
   #custWeight:disabled { opacity: 0.4; cursor: not-allowed; }
-  #custSize {
+  #custSize, #custSpacing {
     accent-color: #E8EEF7;
     cursor: pointer;
     height: 16px;
@@ -716,6 +716,11 @@
       <option value="800">800</option>
       <option value="900">900</option>
     </select>
+  </div>
+  <div class="cust-row">
+    <span class="cust-label">Spacing</span>
+    <input id="custSpacing" type="range" min="-50" max="50" step="1" value="0" />
+    <span class="cust-val" id="custSpacingVal">0</span>
   </div>
   <div class="cust-row">
     <span class="cust-label">Image</span>
@@ -1074,6 +1079,15 @@
   let   currentFontKey = 'inter';       // active font family key
   let   currentWeight  = 400;           // active font weight
   let   cssFontKey     = 'inter';       // suffix used for the registered FontFace family (__kern_<cssFontKey>)
+  let   userSpacingEm  = 0;             // "tighter ↔ looser" user offset, em (-0.05..0.05)
+
+  // Size-adaptive tracking (optical sizing): loosen small sizes, tighten display sizes.
+  // Returns em to add per gap. Curve modeled on Inter / iOS Dynamic Type tracking tables.
+  function autoTrackEm(px) {
+    if (px <= 14) return 0.02;
+    if (px <= 72) return 0.02 * (1 - (px - 14) / (72 - 14));   // +0.02 → 0 across 14–72px
+    return -0.012 * Math.min(1, (px - 72) / (200 - 72));       // 0 → -0.012 across 72–200px+
+  }
   const BASELINE_Y    = 290;
   const VIEWBOX_W     = 1400;
   const VIEWBOX_H     = 420;
@@ -1566,13 +1580,15 @@
     const tmpCv = document.createElement('canvas');
     const tmpCtx = tmpCv.getContext('2d');
     tmpCtx.font = `${FONT_SIZE}px "__kern_${cssFontKey}"`;
+    // size-adaptive tracking (optical sizing) + user "tighter/looser" offset, in SVG units per gap
+    const extraTrack = (autoTrackEm(FONT_SIZE) + userSpacingEm) * FONT_SIZE;
     const def = [];
     for (let i = 0; i < text.length; i++) {
       // position of letter i = advance of all preceding letters with kerning applied
       // = measureText(text[0..i]).width - measureText(text[i]).width
       const pos = i === 0 ? 0
         : tmpCtx.measureText(text.slice(0, i + 1)).width - tmpCtx.measureText(text[i]).width;
-      def.push(pos + i * tracking);
+      def.push(pos + i * (tracking + extraTrack));
     }
     algoPositions.default = def;
 
@@ -1583,7 +1599,7 @@
       const a = letterData[i], b = letterData[i+1];
       const dx = (a.isSpace || b.isSpace) ? a.advance
         : dxForWeightedTarget(a, b, optTgt, minNoOverlapDx(a, b) + fc, fontMetrics);
-      optical.push(optical[i] + dx + tracking);
+      optical.push(optical[i] + dx + tracking + extraTrack);
     }
     algoPositions.optical = optical;
 
@@ -4293,6 +4309,15 @@
     rebuild(false);
   });
 
+  const custSpacing = document.getElementById('custSpacing');
+  const custSpacingVal = document.getElementById('custSpacingVal');
+  custSpacing.addEventListener('input', () => {
+    const v = parseInt(custSpacing.value, 10);
+    userSpacingEm = v / 1000;   // -0.05 .. 0.05 em
+    custSpacingVal.textContent = (v > 0 ? '+' : '') + v;
+    rebuild(false);
+  });
+
   custImageBtn.addEventListener('click', () => custImageInput.click());
   custImageInput.addEventListener('change', e => {
     const file = e.target.files[0];
@@ -4490,6 +4515,32 @@ ${JSON.stringify(c, null, 2)}
     overlay.classList.remove('hidden');
   }
   document.getElementById('custHelp').addEventListener('click', showHelpModal);
+
+  // ── dev-only kerning audit (call __kernAudit() in console) ──
+  // Sanity-checks the optical engine: coefficient of variation (CV) of achieved weighted
+  // gap area across pairs (lower = more even "color") and the minimum ink clearance
+  // (must stay > 0 = no collisions). Run per font / weight / size to confirm it holds.
+  window.__kernAudit = function (text) {
+    if (!currentFont) return 'no font loaded';
+    text = text || 'Hamburgefonstiv AV To Wa Ta LT rn oo VA Yo ll';
+    const m = computeFontMetrics(currentFont);
+    const data = Array.from(text).map(ch => measureGlyph(ch, currentFont));
+    const target = opticalTarget(m);
+    const areas = []; let minClear = Infinity;
+    for (let i = 0; i < data.length - 1; i++) {
+      const a = data[i], b = data[i + 1];
+      if (a.isSpace || b.isSpace) continue;
+      const floor = minNoOverlapDx(a, b) + m.xH * 0.08;
+      const dx = dxForWeightedTarget(a, b, target, floor, m);
+      areas.push(weightedPoolArea(a, b, dx, m));
+      minClear = Math.min(minClear, dx - (minNoOverlapDx(a, b) - MIN_CLEARANCE));
+    }
+    const mean = areas.reduce((s, x) => s + x, 0) / areas.length;
+    const cv = Math.sqrt(areas.reduce((s, x) => s + (x - mean) ** 2, 0) / areas.length) / mean;
+    return { font: currentFontKey, weight: currentWeight, sizePx: Math.round(FONT_SIZE),
+             cv: +cv.toFixed(4), pairs: areas.length, minClearancePx: +minClear.toFixed(2),
+             collisionFree: minClear > 0 };
+  };
 
   // ── boot ──────────────────────────────────────────────
   document.body.style.background = bgColor;            // default background: #0F172A (no image)
